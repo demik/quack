@@ -1,6 +1,7 @@
 set(srcs "blue.c"
          "esp_hid_gap.c"
 	 "gpio.c"
+	 "led.c"
 	 "main.c")
          
 set(include_dirs ".")

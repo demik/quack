@@ -16,6 +16,7 @@
 #include "esp_spi_flash.h"
 
 #include "blue.h"
+#include "led.h"
 #include "gpio.h"
 
 static const char* TAG = "quack";
@@ -38,5 +39,6 @@ void app_main(void)
 	ESP_LOGI(TAG, "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
 
 	gpio_init();
+	led_init();
 	blue_init();
 }

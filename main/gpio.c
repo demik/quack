@@ -17,12 +17,13 @@
 #include "gpio.h"
 
 void	gpio_init(void) {
-	gpio_reset_pin(GREENLED_GPIO);
-	gpio_set_direction(GREENLED_GPIO, GPIO_MODE_OUTPUT);
-
-	/* do a half second blink for debug mode */
-	gpio_set_level(GREENLED_GPIO, 1);
-	vTaskDelay(500 / portTICK_PERIOD_MS);
-	gpio_set_level(GREENLED_GPIO, 0);
-	vTaskDelay(500 / portTICK_PERIOD_MS);
+	/* LEDs */
+	gpio_reset_pin(GPIO_GREENLED);
+	gpio_reset_pin(GPIO_BLUELED);
+	gpio_reset_pin(GPIO_YELLOWLED);
+	gpio_reset_pin(GPIO_REDLED);
+	gpio_set_direction(GPIO_GREENLED, GPIO_MODE_OUTPUT);
+	gpio_set_direction(GPIO_BLUELED, GPIO_MODE_OUTPUT);
+	gpio_set_direction(GPIO_YELLOWLED, GPIO_MODE_OUTPUT);
+	gpio_set_direction(GPIO_REDLED, GPIO_MODE_OUTPUT);
 }

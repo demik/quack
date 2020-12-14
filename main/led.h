@@ -1,8 +1,8 @@
 /*
- *  gpio.h
+ *  led.h
  *  quack
  *
- *  Created by Michel DEPEIGE on 13/09/2020.
+ *  Created by Michel DEPEIGE on 15/12/2020.
  *  Copyright (c) 2020 Michel DEPEIGE.
  *
  * This program is free software; you can redistribute it and/or modify
@@ -22,43 +22,12 @@
  *
  */
 
-#ifndef GPIO_H
-#define GPIO_H
+#ifndef LED_H
+#define LED_H
 
 /* prototypes */
-void	gpio_init(void);
+void	led_init(void);
+void    led_task(void *pvParameters);
 
-/* GPIO pins definitions
- *
- * pin layout is compatible with ESP32-CAM module for prototyping
- * LEDs aren't avaible on ESP32-CAM but DEBUG LED (Camera connector)
- * 
- * on ESP32-CAM the following pins are already used:
- * - CSI_MCLK (GPIO0) 
- * - U0TXD (GPIO1)
- * - U0TXD (GPIO3)
- * - FLASH (GPIO4)
- *
- * on ESP32-PICO-D4, the following pins are used for connecting the
- * embedded flash:
- * - CLK (GPIO6)
- * - SD0 (GPIO7)
- * - SD1 (GPIO8)
- * - CMD (GPIO11)
- * - GPIO16
- * - GPIO17
- */
-
-#define ADB_GPIO	4
-#define CLICK_HPIO	2
-#define QX1_GPIO	12
-#define QX2_GPIO	13
-#define QY1_GPIO	14
-#define QY2_GPIO	15
-
-#define GPIO_GREENLED	21
-#define GPIO_BLUELED	25
-#define GPIO_YELLOWLED	26
-#define GPIO_REDLED	27
 #endif
 
