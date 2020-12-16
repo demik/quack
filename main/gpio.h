@@ -49,12 +49,12 @@ void	gpio_init(void);
  * - GPIO17
  */
 
-#define ADB_GPIO	4
-#define CLICK_HPIO	2
-#define QX1_GPIO	12
-#define QX2_GPIO	13
-#define QY1_GPIO	14
-#define QY2_GPIO	15
+#define GPIO_ADB	4
+#define GPIO_CLICK	2
+#define GPIO_QX1	12
+#define GPIO_QX2	13
+#define GPIO_QY1	14
+#define GPIO_QY2	15
 
 #define GPIO_GREENLED	21
 #define GPIO_BLUELED	25

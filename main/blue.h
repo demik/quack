@@ -28,6 +28,8 @@
 /* prototypes */
 void	blue_init(void);
 
+/* global variables for tasks handles */
+extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
 
 #endif
 

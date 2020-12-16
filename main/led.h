@@ -29,5 +29,12 @@
 void	led_init(void);
 void    led_task(void *pvParameters);
 
+/* defines */
+#define LED_OFF		(1 << 0)
+#define LED_ON		(1 << 1)
+#define LED_ONCE	(1 << 2)
+#define LED_SLOW	(1 << 3)
+#define LED_FAST	(1 << 4)
+
 #endif
 

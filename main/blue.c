@@ -28,12 +28,14 @@
 #include "esp_hid_gap.h"
 
 #include "blue.h"
+#include "led.h"
 
 static const char *TAG = "blue";
 
 #define	BTMOUSE_BUTTON1	(1 << 0)
 #define	BTMOUSE_BUTTON2	(1 << 1)
 #define	BTMOUSE_BUTTON3	(1 << 2)
+#define BTMOUSE_BUTTONE 248
 
 void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
@@ -63,6 +65,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 			else
 				ESP_LOGI(TAG, "opened connection with device: " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 			//esp_hidh_dev_dump(param->open.dev, stdout);
+            xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
 			break;
 		}
 		case ESP_HIDH_BATTERY_EVENT: {
@@ -74,6 +77,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 						   const uint8_t *bda = esp_hidh_dev_bda_get(param->input.dev);
 						   ESP_LOGD(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
 						   ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
+                           xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 						   memcpy (&click, param->input.data, sizeof(uint8_t));
 						   click = click & (BTMOUSE_BUTTON1 | BTMOUSE_BUTTON2 | BTMOUSE_BUTTON3);
 						   if (click)
@@ -90,6 +94,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 			const uint8_t *bda = esp_hidh_dev_bda_get(param->close.dev);
 			ESP_LOGI(TAG, ESP_BD_ADDR_STR " CLOSE: '%s' %s", ESP_BD_ADDR_HEX(bda), esp_hidh_dev_name_get(param->close.dev), esp_hid_disconnect_reason_str(esp_hidh_dev_transport_get(param->close.dev), param->close.reason));
 			esp_hidh_dev_free(param->close.dev);
+            xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 			break;
 		}
 		default:
@@ -159,8 +164,13 @@ void blue_init(void)
 		.callback = hidh_callback,
 	};
 
-	ESP_ERROR_CHECK( esp_hidh_init(&config) );
+	ESP_ERROR_CHECK(esp_hidh_init(&config));
 
-	/* keep scanning until a device is found */
+    /* at this point, everything but bluetooth is started.
+     * put green steady, start blinking blue and keep scanning until a device is found
+     */
+    
+    xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+    xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 	xTaskCreatePinnedToCore(&hid_demo_task, "hid_task", 6 * 1024, NULL, 2, NULL, 0);
 }
