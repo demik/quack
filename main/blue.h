@@ -25,8 +25,12 @@
 #ifndef BLUE_H
 #define BLUE_H
 
+/* defines */
+#define BLUE_SCAN_DURATION 6
+
 /* prototypes */
 void	blue_init(void);
+void    blue_scan(void *pvParameters);
 
 /* global variables for tasks handles */
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
