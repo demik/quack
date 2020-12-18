@@ -1,0 +1,9 @@
+### v1.1
+- added beads to reduce EMI
+- fixed missong OE on TXB0108
+- tone down LEDs by about 20%
+- fixed Pick&Place rotations
+- added PCB Antenna
+
+### v1.0
+- Initial board release

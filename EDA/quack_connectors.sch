@@ -310,21 +310,6 @@ Text GLabel 5200 3200 0    50   Input ~ 0
 CLICK_3V
 Text GLabel 5200 3300 0    50   Input ~ 0
 QY2_3V
-$Comp
-L power:GND #PWR0120
-U 1 1 5F68010C
-P 5200 3500
-F 0 "#PWR0120" H 5200 3250 50  0001 C CNN
-F 1 "GND" H 5205 3327 50  0000 C CNN
-F 2 "" H 5200 3500 50  0001 C CNN
-F 3 "" H 5200 3500 50  0001 C CNN
-	1    5200 3500
-	1    0    0    -1  
-$EndComp
-Wire Wire Line
-	5200 3500 5200 3400
-Wire Wire Line
-	5200 3400 5300 3400
 Wire Wire Line
 	5200 3300 5300 3300
 Wire Wire Line
@@ -514,4 +499,8 @@ Wire Wire Line
 	9050 3900 9200 3900
 Wire Wire Line
 	9350 3800 9500 3800
+Text GLabel 5200 3400 0    50   Input ~ 0
+OE
+Wire Wire Line
+	5200 3400 5300 3400
 $EndSCHEMATC
