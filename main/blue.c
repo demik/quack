@@ -28,6 +28,7 @@
 #include "esp_hid_gap.h"
 
 #include "blue.h"
+#include "gpio.h"
 #include "led.h"
 
 #define	BTMOUSE_BUTTON1	(1 << 0)
@@ -86,10 +87,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 
 	switch (event) {
         case ESP_HIDH_OPEN_EVENT: {
-			bda = esp_hidh_dev_bda_get(param->open.dev);
-            ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
-			esp_hidh_dev_dump(param->open.dev, stdout);
-            xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
+            blue_open(param);
 			break;
 		}
 		case ESP_HIDH_BATTERY_EVENT: {
@@ -157,8 +155,17 @@ void blue_init(void)
 	xTaskCreatePinnedToCore(&blue_scan, "hid_task", 6 * 1024, NULL, 2, NULL, 0);
 }
 
-void blue_scan(void *pvParameters)
-{
+void blue_open(esp_hidh_event_data_t *p) {
+    const uint8_t *bda = NULL;
+
+    bda = esp_hidh_dev_bda_get(p->open.dev);
+    ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
+    esp_hidh_dev_dump(p->open.dev, stdout);
+    xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
+    gpio_output_enable();
+}
+
+void blue_scan(void *pvParameters) {
     size_t len = 0;
     esp_hid_scan_result_t *mouse = NULL;
     esp_hid_scan_result_t *results = NULL;
@@ -186,13 +193,12 @@ void blue_scan(void *pvParameters)
             }
             r = r->next;
         }
-        if (mouse) {
-            // try to connect to the last mouse found
+
+        // try to connect to the last mouse found
+        if (mouse)
             esp_hidh_dev_open(mouse->bda, mouse->transport, mouse->ble.addr_type);
-        }
-        else {
+        else
             ESP_LOGI(TAG, "devices found but no mouse detected");
-        }
 
         esp_hid_scan_results_free(results);
     }

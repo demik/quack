@@ -43,6 +43,16 @@ void	gpio_init(void) {
 	gpio_set_direction(GPIO_YELLOWLED, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_REDLED, GPIO_MODE_OUTPUT);
     
+    /* External chips */
+    gpio_reset_pin(GPIO_OE);
+    gpio_set_direction(GPIO_OE, GPIO_MODE_OUTPUT);
+
+    /* Modes */
+    gpio_reset_pin(GPIO_ADBSRC);
+    gpio_reset_pin(GPIO_BTOFF);
+    gpio_set_direction(GPIO_ADBSRC, GPIO_MODE_INPUT);
+    gpio_set_direction(GPIO_BTOFF, GPIO_MODE_INPUT);
+
     /* Quadrature mouse */
     gpio_reset_pin(GPIO_CLICK);
     gpio_reset_pin(GPIO_QX1);
@@ -56,4 +66,12 @@ void	gpio_init(void) {
     gpio_set_direction(GPIO_QY2, GPIO_MODE_OUTPUT);
     
     gpio_set_level(GPIO_CLICK, 1);
+}
+
+void    gpio_output_disable(void) {
+    gpio_set_level(GPIO_OE, 0);
+}
+
+void    gpio_output_enable(void) {
+    gpio_set_level(GPIO_OE, 1);
 }

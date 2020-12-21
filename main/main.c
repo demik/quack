@@ -27,6 +27,7 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_hidh.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_spi_flash.h"
@@ -57,5 +58,14 @@ void app_main(void)
 
 	gpio_init();
 	led_init();
-	blue_init();
+
+    /* Check /BTOFF and enable bluetooth if needed */
+    if (gpio_get_level(GPIO_BTOFF) == 1)
+        blue_init();
+
+    /* Blink error if no inputs (/BTOFF and no /ADBSRC) */
+    if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {
+        ESP_LOGE(TAG, "Bluetooth is off and ADB is in device mode!");
+        xTaskNotify(t_red, LED_SLOW, eSetValueWithOverwrite);
+    }
 }

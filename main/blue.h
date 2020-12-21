@@ -30,6 +30,7 @@
 
 /* prototypes */
 void	blue_init(void);
+void    blue_open(esp_hidh_event_data_t *p);
 void    blue_scan(void *pvParameters);
 
 /* global variables for tasks handles */
