@@ -26,10 +26,11 @@
 #define BLUE_H
 
 /* defines */
-#define BLUE_SCAN_DURATION 6
+#define BLUE_SCAN_DURATION 8
 
 /* prototypes */
 void	blue_init(void);
+void    blue_close(esp_hidh_event_data_t *p);
 void    blue_open(esp_hidh_event_data_t *p);
 void    blue_scan(void *pvParameters);
 

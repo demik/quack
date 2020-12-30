@@ -47,7 +47,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
     const uint8_t *bda = NULL;
 
 	/*
-     * bda = esp_hidh_event_data_t = union
+     * esp_hidh_event_data_t = union
      *
      * struct {
      *     esp_hidh_dev_t *dev;     // HID Remote bluetooth device
@@ -113,11 +113,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 						     break;
 					     }
 		case ESP_HIDH_CLOSE_EVENT: {
-            bda = esp_hidh_dev_bda_get(param->close.dev);
-            ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR ", reason: %s", ESP_BD_ADDR_HEX(bda),
-                         esp_hid_disconnect_reason_str(esp_hidh_dev_transport_get(param->close.dev), param->close.reason));
-			esp_hidh_dev_free(param->close.dev);
-            xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+			blue_close(param);
 			break;
 		}
 		default:
@@ -152,15 +148,42 @@ void blue_init(void)
     
     xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
     xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
-	xTaskCreatePinnedToCore(&blue_scan, "hid_task", 6 * 1024, NULL, 2, NULL, 0);
+	xTaskCreatePinnedToCore(&blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
+}
+
+void blue_close(esp_hidh_event_data_t *p) {
+	const uint8_t *bda = NULL;
+
+	configASSERT(p != NULL);
+	bda = esp_hidh_dev_bda_get(p->close.dev);
+	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR ", reason: %s", ESP_BD_ADDR_HEX(bda),
+				 esp_hid_disconnect_reason_str(esp_hidh_dev_transport_get(p->close.dev), p->close.reason));
+	esp_hidh_dev_free(p->close.dev);
+	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 }
 
 void blue_open(esp_hidh_event_data_t *p) {
     const uint8_t *bda = NULL;
 
+	configASSERT(p != NULL);
     bda = esp_hidh_dev_bda_get(p->open.dev);
     ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
-    esp_hidh_dev_dump(p->open.dev, stdout);
+
+    //fprintf(fp, "BDA:" ESP_BD_ADDR_STR ", Status: %s, Connected: %s, Handle: %d, Usage: %s\n", ESP_BD_ADDR_HEX(dev->bda), s_bta_hh_status_names[dev->status], dev->connected ? "YES" : "NO", dev->bt.handle, esp_hid_usage_str(dev->usage));
+
+    //ESP_LOGI(TAG, "opened connection with "
+    // ESP_LOGI(TAG, "PID: 0x%04x, VID: 0x%04x, VERSION: 0x%04x\n", p->open.dev->config.product_id, p->open.dev->config.vendor_id, p->open.dev->config.version);
+    //fprintf(fp, "Report Map Length: %d\n", dev->config.report_maps[0].len);
+
+    //esp_hidh_dev_report_t *report = dev->reports;
+    //while (report) {
+    //    fprintf(fp, "  %8s %7s %6s, ID: %3u, Length: %3u\n",
+    //           esp_hid_usage_str(report->usage), esp_hid_report_type_str(report->report_type), esp_hid_protocol_mode_str(report->protocol_mode),
+    //           report->report_id, report->value_len);
+    //    report = report->next;
+    //}
+
+    // (p->open.dev, stdout);
     xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
     gpio_output_enable();
 }
@@ -205,3 +228,14 @@ void blue_scan(void *pvParameters) {
 
     vTaskDelete(NULL);
 }
+
+/*
+ * /!\ crap below /!\
+ * This is needed to link bluedroid without BLE
+ * esp-idf/components/bt/host/bluedroid/api/esp_gap_ble_api.c:386:
+ * undefined reference to `BTM_CheckAdvData'
+ */
+
+//unsigned char *BTM_CheckAdvData(unsigned char *p_adv, unsigned char type, unsigned char *p_length) {
+//    return (unsigned char *)"";
+//}

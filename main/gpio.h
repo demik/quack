@@ -51,21 +51,21 @@ void    gpio_output_enable(void);
  * - GPIO17
  */
 
-#define GPIO_ADB	    4
-#define GPIO_CLICK	    2
-#define GPIO_QX1	    12
-#define GPIO_QX2	    13
-#define GPIO_QY1	    14
-#define GPIO_QY2        15
+#define GPIO_ADB		4
+#define GPIO_CLICK		2
+#define GPIO_QX1		12
+#define GPIO_QX2		13
+#define GPIO_QY1		14
+#define GPIO_QY2		15
 
-#define GPIO_OE         22
-#define GPIO_ADBSRC     32
-#define GPIO_BTOFF      33
+#define GPIO_OE			22
+#define GPIO_ADBSRC		32
+#define GPIO_BTOFF		33
 
 #define GPIO_GREENLED	21
 #define GPIO_BLUELED	25
 #define GPIO_YELLOWLED	26
-#define GPIO_REDLED	    27
+#define GPIO_REDLED		27
 
 #endif
 
