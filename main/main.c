@@ -45,27 +45,27 @@ void app_main(void)
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
 	ESP_LOGI(TAG, "This is %s chip with %d CPU cores, WiFi%s%s, "
-		"revision %d, %dMB %s flash",
-		CONFIG_IDF_TARGET,
-		chip_info.cores,
-		(chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
-		(chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "",
-		chip_info.revision,
-		spi_flash_get_chip_size() / (1024 * 1024),
-		(chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
+			"revision %d, %dMB %s flash",
+			CONFIG_IDF_TARGET,
+			chip_info.cores,
+			(chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
+			(chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "",
+			chip_info.revision,
+			spi_flash_get_chip_size() / (1024 * 1024),
+			(chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
 	ESP_LOGI(TAG, "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
 
 	gpio_init();
 	led_init();
 
-    /* Check /BTOFF and enable bluetooth if needed */
-    if (gpio_get_level(GPIO_BTOFF) == 1)
-        blue_init();
+	/* Check /BTOFF and enable bluetooth if needed */
+	if (gpio_get_level(GPIO_BTOFF) == 1)
+		blue_init();
 
-    /* Blink error if no inputs (/BTOFF and no /ADBSRC) */
-    if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {
-        ESP_LOGE(TAG, "Bluetooth is off and ADB is in device mode!");
-        xTaskNotify(t_red, LED_SLOW, eSetValueWithOverwrite);
-    }
+	/* Blink error if no inputs (/BTOFF and no /ADBSRC) */
+	if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {
+		ESP_LOGE(TAG, "Bluetooth is off and ADB is in device mode!");
+		xTaskNotify(t_red, LED_SLOW, eSetValueWithOverwrite);
+	}
 }
