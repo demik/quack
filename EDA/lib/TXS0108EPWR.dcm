@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP TXS0108EPWR
+D TXS0108EPWR, Voltage Level Translator, Open Drain 1.2  3.6 V, 1.65  5.5 V 20-Pin TSSOP
+K
+F http://www.ti.com/lit/ds/symlink/txs0108e.pdf
+$ENDCMP
+#
+#End Doc Library

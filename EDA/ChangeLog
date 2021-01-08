@@ -1,6 +1,8 @@
 ### v1.2
 - moved a few labels around the silk layer
 - moved the ADB socket out by 2mm
+- tone down LEDs by about 50% (christmas is over)
+- replaced TXB0108PWR by TXS0108EPWR
 
 ### v1.1
 - added beads to reduce EMI

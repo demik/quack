@@ -5,7 +5,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 2 2
 Title "Quack Mouse Adapter"
-Date "2020-12-30"
+Date "2021-01-08"
 Rev "1.2"
 Comp "Lostwave"
 Comment1 "https://68kmla.org"
@@ -37,23 +37,6 @@ F 1 "DB9_Male" H 9980 3655 50  0000 L CNN
 F 2 "Quack_DB9:23018431" H 9800 3700 50  0001 C CNN
 F 3 " ~" H 9800 3700 50  0001 C CNN
 	1    9800 3700
-	1    0    0    -1  
-$EndComp
-$Comp
-L TXB0108PWR:TXB0108PWR IC2
-U 1 1 5F5EC2ED
-P 5300 2500
-F 0 "IC2" H 5850 2765 50  0000 C CNN
-F 1 "TXB0108PWR" H 5850 2674 50  0000 C CNN
-F 2 "Package_SO:TSSOP-20_4.4x6.5mm_P0.65mm" H 6250 2600 50  0001 L CNN
-F 3 "http://www.ti.com/lit/ds/symlink/txb0108.pdf" H 6250 2500 50  0001 L CNN
-F 4 "8-Bit Bidirectional Voltage-Level Shifter with Auto Direction Sensing and +/-15-kV ESD Protect" H 6250 2400 50  0001 L CNN "Description"
-F 5 "1.2" H 6250 2300 50  0001 L CNN "Height"
-F 6 "595-TXB0108PWR" H 6250 2200 50  0001 L CNN "Mouser Part Number"
-F 7 "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/TXB0108PWR?qs=oFXvjAmG9EgEUWGWzOVFCA%3D%3D" H 6250 2100 50  0001 L CNN "Mouser Price/Stock"
-F 8 "Texas Instruments" H 6250 2000 50  0001 L CNN "Manufacturer_Name"
-F 9 "TXB0108PWR" H 6250 1900 50  0001 L CNN "Manufacturer_Part_Number"
-	1    5300 2500
 	1    0    0    -1  
 $EndComp
 $Comp
@@ -503,4 +486,21 @@ Text GLabel 5200 3400 0    50   Input ~ 0
 OE
 Wire Wire Line
 	5200 3400 5300 3400
+$Comp
+L TXS0108EPWR:TXS0108EPWR IC2
+U 1 1 5F5EC2ED
+P 5300 2500
+F 0 "IC2" H 5850 2765 50  0000 C CNN
+F 1 "TXS0108EPWR" H 5850 2674 50  0000 C CNN
+F 2 "TXS0108EPWR:SOP65P640X120-20N" H 6250 2600 50  0001 L CNN
+F 3 "http://www.ti.com/lit/ds/symlink/txs0108e.pdf" H 6250 2500 50  0001 L CNN
+F 4 "TXS0108EPWR, Voltage Level Translator, Open Drain 1.2  3.6 V, 1.65  5.5 V 20-Pin TSSOP" H 6250 2400 50  0001 L CNN "Description"
+F 5 "1.2" H 6250 2300 50  0001 L CNN "Height"
+F 6 "595-TXS0108EPWR" H 6250 2200 50  0001 L CNN "Mouser Part Number"
+F 7 "https://www.mouser.co.uk/ProductDetail/Texas-Instruments/TXS0108EPWR/?qs=IUbkBnfnSQLgiWtCbWtYOw%3D%3D" H 6250 2100 50  0001 L CNN "Mouser Price/Stock"
+F 8 "Texas Instruments" H 6250 2000 50  0001 L CNN "Manufacturer_Name"
+F 9 "TXS0108EPWR" H 6250 1900 50  0001 L CNN "Manufacturer_Part_Number"
+	1    5300 2500
+	1    0    0    -1  
+$EndComp
 $EndSCHEMATC
