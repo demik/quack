@@ -53,17 +53,26 @@ void	gpio_init(void) {
 	gpio_set_direction(GPIO_ADBSRC, GPIO_MODE_INPUT);
 	gpio_set_direction(GPIO_BTOFF, GPIO_MODE_INPUT);
 
+	/* ADB */
+	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT|GPIO_MODE_OUTPUT);
+
 	/* Quadrature mouse */
 	gpio_reset_pin(GPIO_CLICK);
 	gpio_reset_pin(GPIO_QX1);
 	gpio_reset_pin(GPIO_QX2);
 	gpio_reset_pin(GPIO_QY1);
 	gpio_reset_pin(GPIO_QY2);
+	gpio_set_pull_mode(GPIO_CLICK, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_QX1, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_QX2, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_QY1, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_QY2, GPIO_PULLDOWN_ONLY);
 	gpio_set_direction(GPIO_CLICK, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QX1, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QX2, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QY1, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QY2, GPIO_MODE_OUTPUT);
+
 
 	gpio_set_level(GPIO_CLICK, 1);
 }

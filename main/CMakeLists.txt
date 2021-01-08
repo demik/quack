@@ -1,4 +1,5 @@
-set(srcs "blue.c"
+set(srcs "adb.c" 
+         "blue.c"
          "esp_hid_gap.c"
 	 "gpio.c"
 	 "led.c"

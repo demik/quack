@@ -32,6 +32,7 @@
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 
+#include "adb.h"
 #include "blue.h"
 #include "led.h"
 #include "gpio.h"
@@ -58,10 +59,16 @@ void app_main(void)
 
 	gpio_init();
 	led_init();
+	adb_init();
 
-	/* Check /BTOFF and enable bluetooth if needed */
+	/*
+	 * Check /BTOFF and enable bluetooth if needed
+	 * of bluetooth is disabled, enable ADB and Quadrature outputs
+	 */
 	if (gpio_get_level(GPIO_BTOFF) == 1)
 		blue_init();
+	else
+		gpio_output_enable();
 
 	/* Blink error if no inputs (/BTOFF and no /ADBSRC) */
 	if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {
