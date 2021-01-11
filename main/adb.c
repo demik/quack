@@ -41,9 +41,14 @@ void	adb_init(void) {
 		xTaskCreatePinnedToCore(&adb_task_host, "ADB_HOST", 6 * 1024, NULL, 4, NULL, 1);
 	else
 		xTaskCreatePinnedToCore(&adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, 4, NULL, 1);
+
+	/* initialise */
 }
 
 void	adb_task_host(void *pvParameters) {
+	/* wait a little bit for H to set up, otherwise devices will not see the reset command */
+	gpio_set_level(GPIO_ADB, 1);
+	vTaskDelay(40 / portTICK_PERIOD_MS);
 	adb_send_reset();
 
 	while (1) {
@@ -57,7 +62,7 @@ void	adb_task_mouse(void *pvParameters) {
 
 void	adb_send_reset() {
 	gpio_set_level(GPIO_ADB, 0);
-	vTaskDelay(3 / portTICK_PERIOD_MS);
+	ets_delay_us(3000);
 	gpio_set_level(GPIO_ADB, 1);
-	vTaskDelay(1 / portTICK_PERIOD_MS);
+	ets_delay_us(1000);
 }
