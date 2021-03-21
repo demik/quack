@@ -33,9 +33,14 @@
 #include "adb.h"
 #include "gpio.h"
 
-void	adb_init(void) {
-	gpio_set_pull_mode(GPIO_ADB, GPIO_PULLUP_ONLY);
+/* static defines */
+static void adb_tx_async(void);
+static void	adb_tx_one(void);
+static void	adb_tx_zero(void);
 
+/* functions */
+
+void	adb_init(void) {
 	/* If jumper is set, switch to ADB host mode */
 	if (gpio_get_level(GPIO_ADBSRC) == 0)
 		xTaskCreatePinnedToCore(&adb_task_host, "ADB_HOST", 6 * 1024, NULL, 4, NULL, 1);
@@ -48,8 +53,10 @@ void	adb_init(void) {
 void	adb_task_host(void *pvParameters) {
 	/* wait a little bit for H to set up, otherwise devices will not see the reset command */
 	gpio_set_level(GPIO_ADB, 1);
-	vTaskDelay(40 / portTICK_PERIOD_MS);
-	adb_send_reset();
+	vTaskDelay(20 / portTICK_PERIOD_MS);
+	adb_tx_reset();
+
+	adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
 
 	while (1) {
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -60,9 +67,57 @@ void	adb_task_mouse(void *pvParameters) {
 
 }
 
-void	adb_send_reset() {
+static inline void	adb_tx_async() {
+	/* send attention (800 µS low) + sync (70 µS high) */
+	gpio_set_level(GPIO_ADB, 0);
+	ets_delay_us(800);
+	gpio_set_level(GPIO_ADB, 1);
+	ets_delay_us(70);
+}
+
+void	adb_tx_cmd(unsigned char cmd) {
+	adb_tx_async();
+
+	/* send actual byte (unrolled loop) */
+	cmd & 0x80 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x40 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x20 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x10 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x08 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x04 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x02 ? adb_tx_one() : adb_tx_zero();
+	cmd & 0x01 ? adb_tx_one() : adb_tx_zero();
+
+	/* stop bit */
+	adb_tx_zero();
+
+	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT);
+}
+
+static inline void	adb_tx_one() {
+	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
+	gpio_set_level(GPIO_ADB, 0);
+	ets_delay_us(30);
+	gpio_set_level(GPIO_ADB, 1);
+	ets_delay_us(60);
+}
+
+void	adb_tx_reset() {
+	/*
+	 * ADB spec says reset signal low for 3ms ±30%
+	 * Note that the ADB Desktop Bus Mouse G5431 uses 4ms when plugged
+	 */
+
 	gpio_set_level(GPIO_ADB, 0);
 	ets_delay_us(3000);
 	gpio_set_level(GPIO_ADB, 1);
 	ets_delay_us(1000);
+}
+
+static inline void	adb_tx_zero() {
+	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
+	gpio_set_level(GPIO_ADB, 0);
+	ets_delay_us(60);
+	gpio_set_level(GPIO_ADB, 1);
+	ets_delay_us(30);
 }
