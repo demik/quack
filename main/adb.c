@@ -31,35 +31,47 @@
 #include "esp_spi_flash.h"
 
 #include "adb.h"
+#include "led.h"
 #include "gpio.h"
 
+extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
+
 /* static defines */
-static void adb_tx_async(void);
+static uint16_t	adb_rx_mouse();
+static bool adb_rx_tlt(void);
+static void adb_tx_as(void);
 static void	adb_tx_one(void);
 static void	adb_tx_zero(void);
 
 /* functions */
 
 void	adb_init(void) {
+	/* initialise */
+	gpio_set_level(GPIO_ADB, 1);
+	adb_tx_reset();
+
 	/* If jumper is set, switch to ADB host mode */
 	if (gpio_get_level(GPIO_ADBSRC) == 0)
 		xTaskCreatePinnedToCore(&adb_task_host, "ADB_HOST", 6 * 1024, NULL, 4, NULL, 1);
 	else
 		xTaskCreatePinnedToCore(&adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, 4, NULL, 1);
-
-	/* initialise */
 }
 
 void	adb_task_host(void *pvParameters) {
-	/* wait a little bit for H to set up, otherwise devices will not see the reset command */
-	gpio_set_level(GPIO_ADB, 1);
-	vTaskDelay(20 / portTICK_PERIOD_MS);
-	adb_tx_reset();
+	uint16_t	data;
 
-	adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
+	if (gpio_get_level(GPIO_BTOFF) == 0)
+		xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
 
+	/* poll the mouse like a maniac. It will answer only if there is user input */
 	while (1) {
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
+		vTaskDelay(20 / portTICK_PERIOD_MS);
+		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
+
+		if (adb_rx_tlt()) {
+			data = adb_rx_mouse();
+			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
+		}
 	}
 }
 
@@ -67,16 +79,53 @@ void	adb_task_mouse(void *pvParameters) {
 
 }
 
-static inline void	adb_tx_async() {
-	/* send attention (800 µS low) + sync (70 µS high) */
+static uint16_t	adb_rx_mouse() {
+	return 0;
+}
+
+static inline bool	adb_rx_tlt() {
+	/*
+	 * Stop-to-start time aka Tlt in some docs. This is called after a command packet
+	 * The start bit has to appear between 140µs and 260µs
+	 *
+	 * return flase if no start bit detected
+	 * return true if start bit detected
+	 */
+
+	char	i;
+
+	/* wait 130µs then start polling */
+	ets_delay_us(130);
+
+	for (i = 0; i < 130; i++) {
+		if (gpio_get_level(GPIO_ADB) == 0) {
+			/* start bit found. wait for the end of it */
+			ets_delay_us(99-2);
+			return true;
+		}
+		ets_delay_us(1);
+	}
+
+	/*
+	 * actually we wait more than 260µs because calling ets_delay_us takes
+	 * a little more than 1µs to call. Depending on scheduling, the wait times is
+	 * between 390µS and 650µs which is way past specs.
+	 */
+
+	return false;
+}
+
+static inline void	adb_tx_as() {
+	/* send attention (800 µs low) + sync (70 µs high) */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(800);
+	ets_delay_us(800-1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(70);
+	ets_delay_us(80-1);
 }
 
 void	adb_tx_cmd(unsigned char cmd) {
-	adb_tx_async();
+	gpio_set_direction(GPIO_ADB, GPIO_MODE_OUTPUT);
+	adb_tx_as();
 
 	/* send actual byte (unrolled loop) */
 	cmd & 0x80 ? adb_tx_one() : adb_tx_zero();
@@ -90,34 +139,34 @@ void	adb_tx_cmd(unsigned char cmd) {
 
 	/* stop bit */
 	adb_tx_zero();
-
 	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT);
 }
 
 static inline void	adb_tx_one() {
 	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(30);
+	ets_delay_us(35-1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(60);
+	ets_delay_us(65-1);
 }
 
 void	adb_tx_reset() {
 	/*
 	 * ADB spec says reset signal low for 3ms ±30%
 	 * Note that the ADB Desktop Bus Mouse G5431 uses 4ms when plugged
+	 * ADB mouse init in <70ms, but lets wait 500ms to be sure
 	 */
 
 	gpio_set_level(GPIO_ADB, 0);
 	ets_delay_us(3000);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(1000);
+	ets_delay_us(500);
 }
 
 static inline void	adb_tx_zero() {
 	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(60);
+	ets_delay_us(65-1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(30);
+	ets_delay_us(35-1);
 }

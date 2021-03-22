@@ -82,7 +82,6 @@ void	led_task(void *pvParameters) {
 				gpio_set_level(color, 1);
 				vTaskDelay(40 / portTICK_PERIOD_MS);
 				gpio_set_level(color, 0);
-				vTaskDelay(40 / portTICK_PERIOD_MS);
 				wait = portMAX_DELAY;
 				break;
 			case LED_FAST:
