@@ -34,6 +34,7 @@ void	adb_tx_cmd(unsigned char cmd);
 void	adb_tx_reset(void);
 
 /* defines */
+#define tskADB_PRIORITY 4
 
 /* ADB commands values from 00591b.pdf page 16-17 */
 #define ADB_MOUSE	(3<<4)

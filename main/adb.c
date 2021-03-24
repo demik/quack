@@ -29,11 +29,14 @@
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_spi_flash.h"
+#include "driver/rmt.h"
 
 #include "adb.h"
 #include "led.h"
 #include "gpio.h"
 
+/* globals */
+rmt_config_t adb_rmt_rx;
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
 
 /* static defines */
@@ -50,11 +53,14 @@ void	adb_init(void) {
 	gpio_set_level(GPIO_ADB, 1);
 	adb_tx_reset();
 
+	/* init RMT driver for ADB RX */
+	adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
+
 	/* If jumper is set, switch to ADB host mode */
 	if (gpio_get_level(GPIO_ADBSRC) == 0)
-		xTaskCreatePinnedToCore(&adb_task_host, "ADB_HOST", 6 * 1024, NULL, 4, NULL, 1);
+		xTaskCreatePinnedToCore(&adb_task_host, "ADB_HOST", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 	else
-		xTaskCreatePinnedToCore(&adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, 4, NULL, 1);
+		xTaskCreatePinnedToCore(&adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 }
 
 void	adb_task_host(void *pvParameters) {
