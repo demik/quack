@@ -34,12 +34,21 @@ void	adb_tx_cmd(unsigned char cmd);
 void	adb_tx_reset(void);
 
 /* defines */
+#define RMT_RX_CHANNEL	RMT_CHANNEL_0
 #define tskADB_PRIORITY 4
+
+/* ADB timers */
+#define	ADB_RESET	3000
+#define ADB_0_LOW	65
+#define ADB_0_HIGH	35
+#define ADB_1_LOW	35
+#define ADB_1_HIGH	65
 
 /* ADB commands values from 00591b.pdf page 16-17 */
 #define ADB_MOUSE	(3<<4)
 #define ADB_TALK	0xC
 #define ADB_LISTEN	0x8
 #define ADB_REG0	0x0
+#define ADB_REG3	0x3
 
 #endif

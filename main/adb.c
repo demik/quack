@@ -27,6 +27,7 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "driver/rmt.h"
@@ -36,7 +37,7 @@
 #include "gpio.h"
 
 /* globals */
-rmt_config_t adb_rmt_rx;
+rmt_config_t adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
 
 /* static defines */
@@ -53,8 +54,14 @@ void	adb_init(void) {
 	gpio_set_level(GPIO_ADB, 1);
 	adb_tx_reset();
 
-	/* init RMT driver for ADB RX */
-	adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
+	/* avoir console flood when installing/uninstalling RMT driver */
+	esp_log_level_set("intr_alloc", ESP_LOG_INFO);
+
+	/* init RMT RX driver with default values for ADB  */
+	adb_rmt_rx.rx_config.filter_en = true;
+	adb_rmt_rx.rx_config.filter_ticks_thresh = 10;
+	adb_rmt_rx.rx_config.idle_threshold = 100;
+	rmt_config(&adb_rmt_rx);
 
 	/* If jumper is set, switch to ADB host mode */
 	if (gpio_get_level(GPIO_ADBSRC) == 0)
@@ -68,16 +75,15 @@ void	adb_task_host(void *pvParameters) {
 
 	if (gpio_get_level(GPIO_BTOFF) == 0)
 		xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+	ESP_LOGI("ADB", "ADB host started");
 
 	/* poll the mouse like a maniac. It will answer only if there is user input */
+	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 200, 0));
+
 	while (1) {
 		vTaskDelay(20 / portTICK_PERIOD_MS);
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
-
-		if (adb_rx_tlt()) {
-			data = adb_rx_mouse();
-			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
-		}
+		data = adb_rx_mouse();
 	}
 }
 
@@ -85,40 +91,34 @@ void	adb_task_mouse(void *pvParameters) {
 
 }
 
-static uint16_t	adb_rx_mouse() {
-	return 0;
+int dur( uint32_t level, uint32_t duration ) {
+	if ( level == 0 ) { return duration; }
+	else { return -1.0 * duration; }
 }
 
-static inline bool	adb_rx_tlt() {
-	/*
-	 * Stop-to-start time aka Tlt in some docs. This is called after a command packet
-	 * The start bit has to appear between 140µs and 260µs
-	 *
-	 * return flase if no start bit detected
-	 * return true if start bit detected
-	 */
+static uint16_t	adb_rx_mouse() {
+	RingbufHandle_t rb = NULL;
+	rmt_item32_t* items = NULL;
+	size_t rx_size = 0;
+	size_t i;
 
-	char	i;
+	rmt_get_ringbuf_handle(RMT_RX_CHANNEL, &rb);
+	assert(rb != NULL);
+	rmt_rx_start(RMT_RX_CHANNEL, true);
+	items = (rmt_item32_t*) xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(10));
+	printf( ">>> %i\n", rx_size);
+	rmt_rx_stop(RMT_RX_CHANNEL);
 
-	/* wait 130µs then start polling */
-	ets_delay_us(130);
-
-	for (i = 0; i < 130; i++) {
-		if (gpio_get_level(GPIO_ADB) == 0) {
-			/* start bit found. wait for the end of it */
-			ets_delay_us(99-2);
-			return true;
-		}
-		ets_delay_us(1);
+	if (rx_size > (1 * sizeof(rmt_item32_t)))
+		xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
+	else
+		return 0;
+	for (i = 0; i < (rx_size / sizeof(rmt_item32_t)); i++) {
+		printf("%d:%dus %d:%dus\n", (items+i)->level0, (items+i)->duration0, (items+i)->level1, (items+i)->duration1);
 	}
+	vRingbufferReturnItem(rb, (void*) items);
 
-	/*
-	 * actually we wait more than 260µs because calling ets_delay_us takes
-	 * a little more than 1µs to call. Depending on scheduling, the wait times is
-	 * between 390µS and 650µs which is way past specs.
-	 */
-
-	return false;
+	return 0;
 }
 
 static inline void	adb_tx_as() {
@@ -131,6 +131,7 @@ static inline void	adb_tx_as() {
 
 void	adb_tx_cmd(unsigned char cmd) {
 	gpio_set_direction(GPIO_ADB, GPIO_MODE_OUTPUT);
+
 	adb_tx_as();
 
 	/* send actual byte (unrolled loop) */
@@ -146,14 +147,15 @@ void	adb_tx_cmd(unsigned char cmd) {
 	/* stop bit */
 	adb_tx_zero();
 	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT);
+	gpio_set_pull_mode(GPIO_ADB, GPIO_PULLUP_ONLY);
 }
 
 static inline void	adb_tx_one() {
 	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(35-1);
+	ets_delay_us(ADB_1_LOW - 1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(65-1);
+	ets_delay_us(ADB_1_HIGH - 1);
 }
 
 void	adb_tx_reset() {
@@ -164,7 +166,7 @@ void	adb_tx_reset() {
 	 */
 
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(3000);
+	ets_delay_us(ADB_RESET);
 	gpio_set_level(GPIO_ADB, 1);
 	ets_delay_us(500);
 }
@@ -172,7 +174,7 @@ void	adb_tx_reset() {
 static inline void	adb_tx_zero() {
 	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(65-1);
+	ets_delay_us(ADB_0_LOW - 1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(35-1);
+	ets_delay_us(ADB_0_HIGH - 1);
 }
