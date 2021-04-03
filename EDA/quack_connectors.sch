@@ -5,8 +5,8 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 2 2
 Title "Quack Mouse Adapter"
-Date "2021-01-08"
-Rev "1.2"
+Date "2021-04-03"
+Rev "1.3"
 Comp "Lostwave"
 Comment1 "https://68kmla.org"
 Comment2 "https://github.com/demik/quack/tree/master/EDA"
