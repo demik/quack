@@ -1,0 +1,9 @@
+EESchema-DOCLIB  Version 2.0
+#
+$CMP SN74LVC4245APWR
+D OCTAL BUS TRANSCEIVER AND 3.3-V TO 5-V SHIFTER WITH 3-STATE OUTPUTS
+K
+F http://componentsearchengine.com/Datasheets/1/SN74LVC4245APWR.pdf
+$ENDCMP
+#
+#End Doc Library

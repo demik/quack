@@ -448,13 +448,11 @@ Wire Wire Line
 NoConn ~ 4150 4600
 NoConn ~ 4150 4500
 NoConn ~ 4150 4300
-NoConn ~ 5950 3600
 NoConn ~ 5950 3400
 NoConn ~ 5950 3300
 NoConn ~ 5950 3200
 NoConn ~ 4150 5200
 NoConn ~ 4150 5300
-NoConn ~ 9400 4250
 $Comp
 L Device:R R5
 U 1 1 5F628CC1
@@ -471,7 +469,7 @@ L Device:C C5
 U 1 1 5F6294FB
 P 3500 5350
 F 0 "C5" H 3615 5396 50  0000 L CNN
-F 1 "0.1uF" H 3615 5305 50  0000 L CNN
+F 1 "100nF" H 3615 5305 50  0000 L CNN
 F 2 "Capacitor_SMD:C_0805_2012Metric" H 3538 5200 50  0001 C CNN
 F 3 "~" H 3500 5350 50  0001 C CNN
 	1    3500 5350
@@ -527,10 +525,10 @@ F 9 "ESP32-PICO-D4" H 5800 2900 50  0001 L CNN "Manufacturer_Part_Number"
 	1    4150 2900
 	1    0    0    -1  
 $EndComp
-Text GLabel 6050 3700 2    50   Output ~ 0
-OE
+Text GLabel 6400 3700 2    50   Output ~ 0
+~OE
 Wire Wire Line
-	5950 3700 6050 3700
+	5950 3700 6400 3700
 $Comp
 L Device:Antenna ANT1
 U 1 1 5FDD7966
@@ -546,4 +544,8 @@ Wire Wire Line
 	3500 2900 3500 1900
 Wire Wire Line
 	3500 2900 4150 2900
+Text GLabel 6050 3600 2    50   Output ~ 0
+DIR
+Wire Wire Line
+	5950 3600 6050 3600
 $EndSCHEMATC
