@@ -1,6 +1,7 @@
 ## Unreleased
 - testing blue PCB
 - replaced RXS0108EPWR by 74LVC2T45 + 74LVC4245
+- tone down LEDs by about 30%
 
 ## PCB 1.2
 - moved a few labels around the silk layer
