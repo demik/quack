@@ -5,7 +5,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 2
 Title "Quack Mouse Adapter"
-Date "2021-04-03"
+Date "2021-04-04"
 Rev "1.3"
 Comp "Lostwave"
 Comment1 "https://68kmla.org"
@@ -46,7 +46,7 @@ L power:+5V #PWR0109
 U 1 1 5F60C48E
 P 8500 1750
 F 0 "#PWR0109" H 8500 1600 50  0001 C CNN
-F 1 "+5V" V 8515 1878 50  0000 L CNN
+F 1 "+5V" H 8400 1950 50  0000 L CNN
 F 2 "" H 8500 1750 50  0001 C CNN
 F 3 "" H 8500 1750 50  0001 C CNN
 	1    8500 1750
@@ -57,7 +57,7 @@ L power:+3.3V #PWR0110
 U 1 1 5F60D325
 P 9500 1750
 F 0 "#PWR0110" H 9500 1600 50  0001 C CNN
-F 1 "+3.3V" V 9515 1878 50  0000 L CNN
+F 1 "+3.3V" H 9400 1950 50  0000 L CNN
 F 2 "" H 9500 1750 50  0001 C CNN
 F 3 "" H 9500 1750 50  0001 C CNN
 	1    9500 1750
@@ -349,10 +349,8 @@ Wire Wire Line
 	6050 3800 5950 3800
 Wire Wire Line
 	6050 3900 5950 3900
-Text GLabel 4050 4000 0    50   UnSpc ~ 0
-FLASH
-Wire Wire Line
-	4150 4000 4050 4000
+Text GLabel 4050 4000 0    50   Input ~ 0
+~FLASH
 $Comp
 L Device:C C4
 U 1 1 5F66EA30
@@ -437,10 +435,10 @@ NoConn ~ 5950 4300
 NoConn ~ 5950 4200
 NoConn ~ 5950 4400
 NoConn ~ 5950 4500
-Text GLabel 4050 3100 0    50   Output ~ 0
-BTOFF
-Text GLabel 4050 3000 0    50   Output ~ 0
-ADBSRC
+Text GLabel 4050 3100 0    50   Input ~ 0
+~BTDIS
+Text GLabel 4050 3000 0    50   Input ~ 0
+~ADBHOST
 Wire Wire Line
 	4150 3100 4050 3100
 Wire Wire Line
@@ -525,10 +523,10 @@ F 9 "ESP32-PICO-D4" H 5800 2900 50  0001 L CNN "Manufacturer_Part_Number"
 	1    4150 2900
 	1    0    0    -1  
 $EndComp
-Text GLabel 6400 3700 2    50   Output ~ 0
+Text GLabel 6050 3700 2    50   Output ~ 0
 ~OE
 Wire Wire Line
-	5950 3700 6400 3700
+	5950 3700 6050 3700
 $Comp
 L Device:Antenna ANT1
 U 1 1 5FDD7966
@@ -548,4 +546,6 @@ Text GLabel 6050 3600 2    50   Output ~ 0
 DIR
 Wire Wire Line
 	5950 3600 6050 3600
+Wire Wire Line
+	4050 4000 4150 4000
 $EndSCHEMATC

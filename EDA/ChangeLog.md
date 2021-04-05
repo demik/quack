@@ -1,7 +1,9 @@
-## Unreleased
+## PCB 1.3
 - testing blue PCB
 - replaced RXS0108EPWR by 74LVC2T45 + 74LVC4245
 - tone down LEDs by about 30%
+- added automatic ADB pullup resistor
+- added decoupling capacitors to level converters
 
 ## PCB 1.2
 - moved a few labels around the silk layer
