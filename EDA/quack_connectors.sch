@@ -5,7 +5,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 2 2
 Title "Quack Mouse Adapter"
-Date "2021-04-04"
+Date "2021-04-17"
 Rev "1.3"
 Comp "Lostwave"
 Comment1 "https://68kmla.org"
@@ -793,4 +793,58 @@ Text Notes 7250 750  0    50   Italic 0
 Pull-up resistor is active on ADB Host Mode only
 Text Notes 5850 2450 0    50   ~ 0
 ADB Transceiver
+$Comp
+L Mechanical:MountingHole H1
+U 1 1 607B0666
+P 1500 5000
+F 0 "H1" H 1600 5046 50  0000 L CNN
+F 1 "M3" H 1600 4955 50  0000 L CNN
+F 2 "MountingHole:MountingHole_3.2mm_M3_Pad" H 1500 5000 50  0001 C CNN
+F 3 "~" H 1500 5000 50  0001 C CNN
+	1    1500 5000
+	1    0    0    -1  
+$EndComp
+$Comp
+L Mechanical:MountingHole H3
+U 1 1 607B0EDF
+P 2000 5000
+F 0 "H3" H 2100 5046 50  0000 L CNN
+F 1 "M3" H 2100 4955 50  0000 L CNN
+F 2 "MountingHole:MountingHole_3.2mm_M3_Pad" H 2000 5000 50  0001 C CNN
+F 3 "~" H 2000 5000 50  0001 C CNN
+	1    2000 5000
+	1    0    0    -1  
+$EndComp
+$Comp
+L Mechanical:MountingHole H2
+U 1 1 607B17B9
+P 1500 5500
+F 0 "H2" H 1600 5546 50  0000 L CNN
+F 1 "M3" H 1600 5455 50  0000 L CNN
+F 2 "MountingHole:MountingHole_3.2mm_M3_Pad" H 1500 5500 50  0001 C CNN
+F 3 "~" H 1500 5500 50  0001 C CNN
+	1    1500 5500
+	1    0    0    -1  
+$EndComp
+$Comp
+L Mechanical:MountingHole H4
+U 1 1 607B212E
+P 2000 5500
+F 0 "H4" H 2100 5546 50  0000 L CNN
+F 1 "M3" H 2100 5455 50  0000 L CNN
+F 2 "MountingHole:MountingHole_3.2mm_M3_Pad" H 2000 5500 50  0001 C CNN
+F 3 "~" H 2000 5500 50  0001 C CNN
+	1    2000 5500
+	1    0    0    -1  
+$EndComp
+Wire Notes Line
+	1000 4500 2500 4500
+Wire Notes Line
+	2500 4500 2500 6000
+Wire Notes Line
+	2500 6000 1000 6000
+Wire Notes Line
+	1000 6000 1000 4500
+Text Notes 1150 5850 0    50   ~ 0
+Mouting holes
 $EndSCHEMATC
