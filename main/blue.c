@@ -131,12 +131,14 @@ void blue_init(void)
 		ret = nvs_flash_init();
 	}
 
+	ESP_LOGD(TAG, "Starting Bluetooth init");
 	ESP_ERROR_CHECK(ret);
 	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_BTDM));
 	ESP_ERROR_CHECK(esp_ble_gattc_register_callback(esp_hidh_gattc_event_handler));
 
 	esp_hidh_config_t config = {
 		.callback = hidh_callback,
+		.event_stack_size = 4096
 	};
 
 	ESP_ERROR_CHECK(esp_hidh_init(&config));
@@ -148,7 +150,7 @@ void blue_init(void)
     
     xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
     xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
-	xTaskCreatePinnedToCore(&blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
+	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
 }
 
 void blue_close(esp_hidh_event_data_t *p) {
@@ -228,14 +230,3 @@ void blue_scan(void *pvParameters) {
 
     vTaskDelete(NULL);
 }
-
-/*
- * /!\ crap below /!\
- * This is needed to link bluedroid without BLE
- * esp-idf/components/bt/host/bluedroid/api/esp_gap_ble_api.c:386:
- * undefined reference to `BTM_CheckAdvData'
- */
-
-//unsigned char *BTM_CheckAdvData(unsigned char *p_adv, unsigned char type, unsigned char *p_length) {
-//    return (unsigned char *)"";
-//}
