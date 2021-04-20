@@ -3,7 +3,8 @@ set(srcs "adb.c"
          "esp_hid_gap.c"
 	 "gpio.c"
 	 "led.c"
-	 "main.c")
+	 "main.c"
+	 "quad.c")
          
 set(include_dirs ".")
 

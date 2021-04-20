@@ -65,14 +65,15 @@ void	adb_init(void) {
 
 	/* If jumper is set, switch to ADB host mode */
 	if (gpio_get_level(GPIO_ADBSRC) == 0)
-		xTaskCreatePinnedToCore(&adb_task_host, "ADB_HOST", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
+		xTaskCreatePinnedToCore(adb_task_host, "ADB_HOST", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 	else
-		xTaskCreatePinnedToCore(&adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
+		xTaskCreatePinnedToCore(adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 }
 
 void	adb_task_host(void *pvParameters) {
 	uint16_t	data;
 
+	/* put green led to steady if BT is disabled. Otherwise BT init will do it */
 	if (gpio_get_level(GPIO_BTOFF) == 0)
 		xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
 	ESP_LOGI("ADB", "ADB host started");
@@ -80,7 +81,7 @@ void	adb_task_host(void *pvParameters) {
 	/* poll the mouse like a maniac. It will answer only if there is user input */
 	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 200, 0));
 
-	while (1) {
+	while (true) {
 		vTaskDelay(20 / portTICK_PERIOD_MS);
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
 		data = adb_rx_mouse();
@@ -88,7 +89,8 @@ void	adb_task_host(void *pvParameters) {
 }
 
 void	adb_task_mouse(void *pvParameters) {
-
+	ESP_LOGI("ADB", "ADB mouse started");
+	vTaskSuspend(NULL);
 }
 
 int dur( uint32_t level, uint32_t duration ) {

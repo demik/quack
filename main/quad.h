@@ -1,9 +1,9 @@
 /*
- *  blue.h
+ *  quad.h
  *  quack
  *
- *  Created by Michel DEPEIGE on 13/09/2020.
- *  Copyright (c) 2020 Michel DEPEIGE.
+ *  Created by Michel DEPEIGE on 17/01/2021.
+ *  Copyright (c) 2021 Michel DEPEIGE.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,21 +22,17 @@
  *
  */
 
-#ifndef BLUE_H
-#define BLUE_H
-
-/* defines */
-#define BLUE_SCAN_DURATION 8
-#define BLUE_SNIP "---8<------------------------------------------"
+#ifndef QUAD_H
+#define QUAD_H
 
 /* prototypes */
-void	blue_init(void);
-void    blue_close(esp_hidh_event_data_t *p);
-void    blue_open(esp_hidh_event_data_t *p);
-void    blue_scan(void *pvParameters);
+void		quad_init(void);
+void		quad_click(void *pvParameters);
+void		quad_move_x(void *pvParameters);
+void		quad_move_y(void *pvParameters);
 
-/* global variables for tasks handles */
-extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
+/* defines */
+#define QUAD_INTERVAL 100
 
 #endif
 

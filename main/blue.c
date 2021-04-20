@@ -39,6 +39,10 @@
 /* debug tag */
 static const char *TAG = "blue";
 
+/* private functions */
+static esp_hid_raw_report_map_t	*blue_hid_rm_get(esp_hidh_dev_t *dev);
+static esp_hid_report_item_t	blue_hid_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p);
+
 void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
 	esp_hidh_event_t event = (esp_hidh_event_t)id;
@@ -142,14 +146,15 @@ void blue_init(void)
 	};
 
 	ESP_ERROR_CHECK(esp_hidh_init(&config));
+	esp_log_level_set("event", ESP_LOG_INFO);
 
     /*
      * at this point, everything but bluetooth is started.
      * put green steady, start blinking blue and keep scanning until a device is found
      */
-    
+
     xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
-    xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+    xTaskNotify(t_blue, LED_FAST, eSetValueWithOverwrite);
 	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
 }
 
@@ -158,36 +163,83 @@ void blue_close(esp_hidh_event_data_t *p) {
 
 	configASSERT(p != NULL);
 	bda = esp_hidh_dev_bda_get(p->close.dev);
-	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR ", reason: %s", ESP_BD_ADDR_HEX(bda),
-				 esp_hid_disconnect_reason_str(esp_hidh_dev_transport_get(p->close.dev), p->close.reason));
+	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 	esp_hidh_dev_free(p->close.dev);
+
 	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 }
 
 void blue_open(esp_hidh_event_data_t *p) {
     const uint8_t *bda = NULL;
 
+	esp_hid_report_item_t	mir;	/* MOUSE INPUT REPORT */
+
 	configASSERT(p != NULL);
     bda = esp_hidh_dev_bda_get(p->open.dev);
     ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 
-    //fprintf(fp, "BDA:" ESP_BD_ADDR_STR ", Status: %s, Connected: %s, Handle: %d, Usage: %s\n", ESP_BD_ADDR_HEX(dev->bda), s_bta_hh_status_names[dev->status], dev->connected ? "YES" : "NO", dev->bt.handle, esp_hid_usage_str(dev->usage));
+	/* search for MIR section */
+	esp_hid_raw_report_map_t *maps;
+	maps = blue_hid_rm_get(p->open.dev);
+	mir = blue_hid_ri_find(p->open.dev, ESP_HID_USAGE_MOUSE, ESP_HID_REPORT_TYPE_INPUT, ESP_HID_PROTOCOL_MODE_REPORT);
 
-    //ESP_LOGI(TAG, "opened connection with "
-    // ESP_LOGI(TAG, "PID: 0x%04x, VID: 0x%04x, VERSION: 0x%04x\n", p->open.dev->config.product_id, p->open.dev->config.vendor_id, p->open.dev->config.version);
-    //fprintf(fp, "Report Map Length: %d\n", dev->config.report_maps[0].len);
-
-    //esp_hidh_dev_report_t *report = dev->reports;
-    //while (report) {
-    //    fprintf(fp, "  %8s %7s %6s, ID: %3u, Length: %3u\n",
-    //           esp_hid_usage_str(report->usage), esp_hid_report_type_str(report->report_type), esp_hid_protocol_mode_str(report->protocol_mode),
-    //           report->report_id, report->value_len);
-    //    report = report->next;
-    //}
-
-    // (p->open.dev, stdout);
     xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
     gpio_output_enable();
+}
+
+/* get specific report from report map matching specified usage + type + protocol */
+static esp_hid_report_item_t blue_hid_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p) {
+	size_t num_reports = 0;
+	esp_hid_report_item_t *reports;
+	esp_hid_report_item_t search;
+
+	configASSERT(d != NULL);
+	configASSERT(p <= ESP_HID_REPORT_TYPE_FEATURE);
+	configASSERT(t > 0);
+
+	esp_hidh_dev_reports_get(d, &num_reports, &reports);
+	memset(&search, 0, sizeof(esp_hid_report_item_t));
+
+	for (uint8_t i = 0; i < num_reports; i++) {
+		if (reports[i].protocol_mode == p && reports[i].report_type == t &&	reports[i].usage == u) {
+			memcpy(&search, &reports[i], sizeof(esp_hid_report_item_t));
+			break;
+		}
+	}
+
+	free(reports);
+	if (search.value_len == 0) {
+		ESP_LOGW(TAG, "%s %s %s not found",
+				 esp_hid_usage_str(u),
+				 esp_hid_report_type_str(t),
+				 esp_hid_protocol_mode_str(p));
+	}
+	else {
+		ESP_LOGD(TAG, "%s %s %s is id %i size %i byte(s)",
+				 esp_hid_usage_str(u),
+				 esp_hid_report_type_str(t),
+				 esp_hid_protocol_mode_str(p),
+				 search.report_id,
+				 search.value_len);
+	}
+
+	return search;
+}
+
+/* get report map raw pointer. Also dump it on JTAG */
+static esp_hid_raw_report_map_t *blue_hid_rm_get(esp_hidh_dev_t *dev) {
+	size_t num_maps = 0;
+	esp_hid_raw_report_map_t *maps;
+
+	configASSERT(dev != NULL);
+	ESP_LOGI(TAG, BLUE_SNIP);
+	esp_hidh_dev_report_maps_get(dev, &num_maps, &maps);
+	ESP_LOG_BUFFER_HEX(TAG, maps[0].data, maps[0].len);
+	ESP_LOGI(TAG, BLUE_SNIP);
+
+	/* looking at 4.2 SDK source, seems there is always only one map */
+	configASSERT(num_maps == 1);
+	return maps;
 }
 
 void blue_scan(void *pvParameters) {
@@ -198,28 +250,27 @@ void blue_scan(void *pvParameters) {
     ESP_LOGI(TAG, "starting scan on core %d…", xPortGetCoreID());
     esp_hid_scan(BLUE_SCAN_DURATION, &len, &results);
     ESP_LOGI(TAG, "scan returned %u result(s)", len);
+	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 
     if (len) {
         esp_hid_scan_result_t *r = results;
+
         while (r) {
-            ESP_LOGI(TAG, "found %s device: " ESP_BD_ADDR_STR ", RSSI: %d, NAME: %s",
-                 (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT",
-                 ESP_BD_ADDR_HEX(r->bda), r->rssi, r->name ? r->name : "");
-        
-            if (r->transport == ESP_HID_TRANSPORT_BLE) {
-                printf("APPEARANCE: 0x%04x, ", r->ble.appearance);
-                printf("ADDR_TYPE: '%s', ", ble_addr_type_str(r->ble.addr_type));
-            } else {
-                if (strcmp("PERIPHERAL", esp_hid_cod_major_str(r->bt.cod.major)) == 0
-                    && (r->bt.cod.minor & ESP_HID_COD_MIN_MOUSE)) {
-                    ESP_LOGI(TAG, "found generic mouse");
+            ESP_LOGI(TAG, "found %s %s device: " ESP_BD_ADDR_STR ", RSSI: %d, NAME: %s",
+					 (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT",
+					 esp_hid_cod_major_str(r->bt.cod.major),
+					 ESP_BD_ADDR_HEX(r->bda), r->rssi, r->name ? r->name : "");
+
+			/* search for something that looks like Bluetooth Classic mouse */
+            if (r->transport == ESP_HID_TRANSPORT_BT &&
+				strcmp("PERIPHERAL", esp_hid_cod_major_str(r->bt.cod.major)) == 0
+				&& (r->bt.cod.minor & ESP_HID_COD_MIN_MOUSE)) {
                     mouse = r;
-                }
             }
             r = r->next;
         }
 
-        // try to connect to the last mouse found
+        /* try to connect to the last candidate found */
         if (mouse)
             esp_hidh_dev_open(mouse->bda, mouse->transport, mouse->ble.addr_type);
         else

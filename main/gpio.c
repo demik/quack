@@ -72,10 +72,6 @@ void	gpio_init(void) {
 	gpio_set_direction(GPIO_QX2, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QY1, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QY2, GPIO_MODE_OUTPUT);
-
-	gpio_set_level(GPIO_CLICK, 1);
-	gpio_set_level(GPIO_QY1, 1);
-	gpio_set_level(GPIO_QY2, 1);
 }
 
 void    gpio_output_disable(void) {

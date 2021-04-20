@@ -36,6 +36,7 @@
 #include "blue.h"
 #include "led.h"
 #include "gpio.h"
+#include "quad.h"
 
 /* global TAG for ESP_LOG */
 static const char* TAG = "quack";
@@ -56,23 +57,27 @@ void app_main(void)
 			(chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
 	ESP_LOGI(TAG, "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
+	ESP_LOGI(TAG, "");
+	ESP_LOGI(TAG, "\\_o< \\_o< \\_o< \\_O<");
+	ESP_LOGI(TAG, "");
 
 	gpio_init();
 	led_init();
+	quad_init();
 	adb_init();
 
 	/*
 	 * Check /BTOFF and enable bluetooth if needed
-	 * of bluetooth is disabled, enable ADB and Quadrature outputs
+	 * of bluetooth is disabled, enable quadrature outputs
 	 */
 	if (gpio_get_level(GPIO_BTOFF) == 1)
 		blue_init();
 	else
 		gpio_output_enable();
 
-	/* Blink error if no inputs (/BTOFF and no /ADBSRC) */
+	/* put LED error ON if no inputs (/BTOFF and no /ADBSRC) */
 	if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {
 		ESP_LOGE(TAG, "Bluetooth is off and ADB is in device mode!");
-		xTaskNotify(t_red, LED_SLOW, eSetValueWithOverwrite);
+		xTaskNotify(t_red, LED_ON, eSetValueWithOverwrite);
 	}
 }
