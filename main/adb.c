@@ -39,15 +39,46 @@
 /* globals */
 rmt_config_t adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
+extern TaskHandle_t t_click, t_qx, t_qy;
 
 /* static defines */
+static void	adb_handle_button(bool action);
+static bool adb_rx_isone(rmt_item32_t cell);
+static bool adb_rx_isstop(rmt_item32_t cell);
+static bool adb_rx_iszero(rmt_item32_t cell);
 static uint16_t	adb_rx_mouse();
+static void adb_rx_setup(void);
 static bool adb_rx_tlt(void);
 static void adb_tx_as(void);
 static void	adb_tx_one(void);
+static void	adb_tx_setup(void);
 static void	adb_tx_zero(void);
 
 /* functions */
+static void	adb_handle_button(bool action) {
+	static bool	status = ADB_B_UP;	// Keep state. Click is active low
+
+	if (status == ADB_B_UP && action == ADB_B_UP)
+		return ;
+	if (status == ADB_B_DOWN && action == ADB_B_DOWN)
+		return ;
+
+	/* release button */
+	if (status == ADB_B_DOWN && action == ADB_B_UP) {
+		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
+		status = ADB_B_UP;
+		ESP_LOGD("ADB", "ADB button released");
+		return ;
+	}
+
+	/* press button */
+	if (status == ADB_B_UP && action == ADB_B_DOWN) {
+		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
+		status = ADB_B_DOWN;
+		ESP_LOGD("ADB", "ADB button pressed");
+		return ;
+	}
+}
 
 void	adb_init(void) {
 	/* initialise */
@@ -71,7 +102,9 @@ void	adb_init(void) {
 }
 
 void	adb_task_host(void *pvParameters) {
+	/* Classic Apple Mouse Protocol is 16 bits long */
 	uint16_t	data;
+	int8_t		move = 0;
 
 	/* put green led to steady if BT is disabled. Otherwise BT init will do it */
 	if (gpio_get_level(GPIO_BTOFF) == 0)
@@ -85,6 +118,34 @@ void	adb_task_host(void *pvParameters) {
 		vTaskDelay(20 / portTICK_PERIOD_MS);
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
 		data = adb_rx_mouse();
+
+		if (data) {
+			/* click is active low */
+			if (! (data & ADB_CMP_B1) || (! (data & ADB_CMP_B2)))
+				adb_handle_button(ADB_B_DOWN);
+			else
+				adb_handle_button(ADB_B_UP);
+
+			move = (data & ADB_CMD_MX) >> 0;
+			if (move & 0x40) {
+				move &= ~0x40;
+				move |= 0x80;
+				move += 64;
+			}
+
+			if (move)
+				xTaskNotify(t_qx, move, eSetValueWithOverwrite);
+
+			move = (data & ADB_CMD_MY) >> 8;
+			if (move & 0x40) {
+				move &= ~0x40;
+				move |= 0x80;
+				move += 64;
+			}
+
+			if (move)
+				xTaskNotify(t_qy, move, eSetValueWithOverwrite);
+		}
 	}
 }
 
@@ -98,7 +159,37 @@ int dur( uint32_t level, uint32_t duration ) {
 	else { return -1.0 * duration; }
 }
 
+/*
+ * some ADB mouses are using cells as short as 24µs+49µs, try to get that...
+ * spec allow ±30% variance
+ *
+ * units are in µs
+ */
+
+static bool adb_rx_isone(rmt_item32_t cell) {
+	if (cell.level0 == 0 && (cell.duration0 >= 22 && cell.duration0 <= 44) &&
+		cell.level1 == 1 && (cell.duration1 >= 46 && cell.duration1 <= 86))
+		return true;
+	return false;
+}
+
+static bool adb_rx_isstop(rmt_item32_t cell) {
+	/* high part of the well is lengh 0 because of RMT timeout (100µs+) */
+	if (cell.level0 == 0 && (cell.duration0 >= 46 && cell.duration0 <= 86) &&
+		cell.level1 == 1 && cell.duration1 == 0)
+		return true;
+	return false;
+}
+
+static bool adb_rx_iszero(rmt_item32_t cell) {
+	if (cell.level0 == 0 && (cell.duration0 >= 46 && cell.duration0 <= 86) &&
+		cell.level1 == 1 && (cell.duration1 >= 22 && cell.duration1 <= 44))
+		return true;
+	return false;
+}
+
 static uint16_t	adb_rx_mouse() {
+	uint16_t data = 0;
 	RingbufHandle_t rb = NULL;
 	rmt_item32_t* items = NULL;
 	size_t rx_size = 0;
@@ -108,19 +199,59 @@ static uint16_t	adb_rx_mouse() {
 	assert(rb != NULL);
 	rmt_rx_start(RMT_RX_CHANNEL, true);
 	items = (rmt_item32_t*) xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(10));
-	printf( ">>> %i\n", rx_size);
+
+	//printf( ">>> %i\n", rx_size);
 	rmt_rx_stop(RMT_RX_CHANNEL);
 
-	if (rx_size > (1 * sizeof(rmt_item32_t)))
-		xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
-	else
+	if (items == NULL)
 		return 0;
-	for (i = 0; i < (rx_size / sizeof(rmt_item32_t)); i++) {
-		printf("%d:%dus %d:%dus\n", (items+i)->level0, (items+i)->duration0, (items+i)->level1, (items+i)->duration1);
+
+	/*
+	 * Mouse response size in bits is events / sizeof(rmt_item32_t) (4)
+	 * start bit + 16 data bits + stop bit = 72 bytes in RMT buffer (18 bits received)
+	 */
+
+	switch (rx_size) {
+		case 0:
+			return 0;
+		case 72:
+			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
+			break;
+		default:
+			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 	}
+
+	/* check start and stop bits */
+	if (! adb_rx_isone(*(items+0)) && (! adb_rx_isstop(*(items+(rx_size / sizeof(rmt_item32_t) - 1))))) {
+		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+		return 0;
+	}
+
+	/* rebuild our data with RMT buffer */
+	for (i = 1; i < ((rx_size / sizeof(rmt_item32_t)) - 1); i++) {
+		data <<= 1;
+
+		/* check that every data is either one or zero */
+		if ((! adb_rx_isone(*(items+i))) && (! adb_rx_iszero(*(items+i)))) {
+			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+			return 0;
+		}
+
+		if (adb_rx_isone(*(items+i)))
+			data |= 1;
+		//printf("%d:%dus %d:%dus ", (items+i)->level0, (items+i)->duration0, (items+i)->level1, (items+i)->duration1);
+	}
+	printf("\n");
 	vRingbufferReturnItem(rb, (void*) items);
 
-	return 0;
+	return data;
+}
+
+static inline void	adb_rx_setup() {
+	gpio_set_level(GPIO_DIR, 0);
+	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT);
+	gpio_pullup_dis(GPIO_ADB);
+	gpio_pulldown_dis(GPIO_ADB);
 }
 
 static inline void	adb_tx_as() {
@@ -132,8 +263,7 @@ static inline void	adb_tx_as() {
 }
 
 void	adb_tx_cmd(unsigned char cmd) {
-	gpio_set_direction(GPIO_ADB, GPIO_MODE_OUTPUT);
-
+	adb_tx_setup();
 	adb_tx_as();
 
 	/* send actual byte (unrolled loop) */
@@ -148,8 +278,7 @@ void	adb_tx_cmd(unsigned char cmd) {
 
 	/* stop bit */
 	adb_tx_zero();
-	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT);
-	gpio_set_pull_mode(GPIO_ADB, GPIO_PULLUP_ONLY);
+	adb_rx_setup();
 }
 
 static inline void	adb_tx_one() {
@@ -171,6 +300,11 @@ void	adb_tx_reset() {
 	ets_delay_us(ADB_RESET);
 	gpio_set_level(GPIO_ADB, 1);
 	ets_delay_us(500);
+}
+
+static inline void	adb_tx_setup() {
+	gpio_set_direction(GPIO_ADB, GPIO_MODE_OUTPUT);
+	gpio_set_level(GPIO_DIR, 1);
 }
 
 static inline void	adb_tx_zero() {

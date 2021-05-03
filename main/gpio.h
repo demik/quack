@@ -58,6 +58,7 @@ void    gpio_output_enable(void);
 #define GPIO_QY1		14
 #define GPIO_QY2		15
 
+#define GPIO_DIR		19
 #define GPIO_OE			22
 #define GPIO_ADBSRC		32
 #define GPIO_BTOFF		33
