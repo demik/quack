@@ -412,10 +412,10 @@ static esp_err_t init_bt_gap(void)
      */
     esp_bt_pin_type_t pin_type = ESP_BT_PIN_TYPE_FIXED;
     esp_bt_pin_code_t pin_code;
-    pin_code[0] = '1';
-    pin_code[1] = '2';
-    pin_code[2] = '3';
-    pin_code[3] = '4';
+    pin_code[0] = '0';
+    pin_code[1] = '0';
+    pin_code[2] = '0';
+    pin_code[3] = '0';
     esp_bt_gap_set_pin(pin_type, 4, pin_code);
 
     if ((ret = esp_bt_gap_register_callback(bt_gap_event_handler)) != ESP_OK) {
