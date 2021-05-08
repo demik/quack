@@ -65,11 +65,11 @@ void	gpio_init(void) {
 	gpio_reset_pin(GPIO_QX2);
 	gpio_reset_pin(GPIO_QY1);
 	gpio_reset_pin(GPIO_QY2);
-	gpio_set_pull_mode(GPIO_CLICK, GPIO_PULLDOWN_ONLY);
-	gpio_set_pull_mode(GPIO_QX1, GPIO_PULLDOWN_ONLY);
-	gpio_set_pull_mode(GPIO_QX2, GPIO_PULLDOWN_ONLY);
-	gpio_set_pull_mode(GPIO_QY1, GPIO_PULLDOWN_ONLY);
-	gpio_set_pull_mode(GPIO_QY2, GPIO_PULLDOWN_ONLY);
+	gpio_set_pull_mode(GPIO_CLICK, GPIO_PULLUP_ONLY);
+	gpio_set_pull_mode(GPIO_QX1, GPIO_PULLUP_ONLY);
+	gpio_set_pull_mode(GPIO_QX2, GPIO_PULLUP_ONLY);
+	gpio_set_pull_mode(GPIO_QY1, GPIO_PULLUP_ONLY);
+	gpio_set_pull_mode(GPIO_QY2, GPIO_PULLUP_ONLY);
 	gpio_set_direction(GPIO_CLICK, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QX1, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QX2, GPIO_MODE_OUTPUT);

@@ -41,7 +41,7 @@ TaskHandle_t t_click, t_qx, t_qy;
 esp_timer_handle_t quad_qx, quad_qy;
 
 /* static functions */
-static void	quad_timer(void* arg);
+static void	IRAM_ATTR quad_timer(void* arg);
 
 /* phases */
 const bool q1[] = {true, false, false, true};
@@ -52,7 +52,7 @@ void	quad_init(void) {
 	esp_timer_create_args_t args;
 
 	/* create quadrature tasks */
-	xTaskCreate(quad_click, "CLICK", 4 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_click);
+	xTaskCreate(quad_click, "CLICK", 1024, NULL, tskIDLE_PRIORITY + 1, &t_click);
 	xTaskCreate(quad_move_x, "QX", 4 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_qx);
 	xTaskCreate(quad_move_y, "QY", 4 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_qy);
 
@@ -78,7 +78,7 @@ void	quad_init(void) {
 	args.name = "quad_qy";
 	ESP_ERROR_CHECK(esp_timer_create(&args, &quad_qy));
 
-	ESP_LOGI("quad", "Quadrature tasks started");
+	ESP_LOGI("quad", "Quadrature tasks started on core %d", xPortGetCoreID());
 }
 
 void	quad_click(void *pvParameters) {
@@ -88,7 +88,6 @@ void	quad_click(void *pvParameters) {
 
 	while (true) {
 		xTaskNotifyWait(0, 0, &click, portMAX_DELAY);
-		printf("CLICK");
 		switch (click)
 		{
 			case true:
@@ -117,20 +116,20 @@ void	quad_move_x(void *pvParameters) {
 
 		if (move > 0) {
 			while (move--) {
-				i++;
-				printf("MOVE X %i %i %i\n", move, q1[i % 4], q2[i % 4]);
+				i--;
 				gpio_set_level(GPIO_QX1, q1[i % 4]);
 				gpio_set_level(GPIO_QX2, q2[i % 4]);
-				//ets_delay_us(QUAD_INTERVAL);
+				ESP_ERROR_CHECK(esp_timer_start_once(quad_qx, QUAD_INTERVAL));
+				vTaskSuspend(NULL);
 			}
 		}
 		else {
 			while (move++) {
-				i--;
-				printf("MOVE X %i %i %i\n", move, q1[i % 4], q2[i % 4]);
+				i++;
 				gpio_set_level(GPIO_QX1, q1[i % 4]);
 				gpio_set_level(GPIO_QX2, q2[i % 4]);
-				//ets_delay_us(QUAD_INTERVAL);
+				ESP_ERROR_CHECK(esp_timer_start_once(quad_qx, QUAD_INTERVAL));
+				vTaskSuspend(NULL);
 			}
 		}
 	}
@@ -151,30 +150,27 @@ void	quad_move_y(void *pvParameters) {
 		if (move > 0) {
 			while (move--) {
 				i++;
-				printf("MOVE Y %i %i %i\n", move, q1[i % 4], q2[i % 4]);
 				gpio_set_level(GPIO_QY1, q1[i % 4]);
 				gpio_set_level(GPIO_QY2, q2[i % 4]);
-				//ets_delay_us(QUAD_INTERVAL);
+				ESP_ERROR_CHECK(esp_timer_start_once(quad_qy, QUAD_INTERVAL));
+				vTaskSuspend(NULL);
 			}
 		}
 		else {
 			while (move++) {
 				i--;
-				printf("MOVE Y %i %i %i\n", move, q1[i % 4], q2[i % 4]);
 				gpio_set_level(GPIO_QY1, q1[i % 4]);
 				gpio_set_level(GPIO_QY2, q2[i % 4]);
-				//ets_delay_us(QUAD_INTERVAL);
+				ESP_ERROR_CHECK(esp_timer_start_once(quad_qy, QUAD_INTERVAL));
+				vTaskSuspend(NULL);
 			}
 		}
 	}
 }
 
 /* simple ISR function. Resume task that called the oneshot timer */
-static void quad_timer(void* arg) {
+static void IRAM_ATTR quad_timer(void* arg) {
 	BaseType_t xYieldRequired = pdFALSE;
-
-	printf(">>> TIMER %x\n", (unsigned int)arg);
-
 	xYieldRequired = xTaskResumeFromISR(arg);
 
 	/* switch context of needed */
