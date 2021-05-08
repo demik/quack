@@ -46,7 +46,7 @@ static void	adb_handle_button(bool action);
 static bool	adb_rx_isone(rmt_item32_t cell);
 static bool	adb_rx_isstop(rmt_item32_t cell);
 static bool	adb_rx_iszero(rmt_item32_t cell);
-static uint16_t	adb_rx_mouse();
+static uint16_t	IRAM_ATTR adb_rx_mouse();
 static void	adb_rx_setup(void);
 static bool	adb_rx_tlt(void);
 static void	adb_tx_as(void);
@@ -109,13 +109,14 @@ void	adb_task_host(void *pvParameters) {
 	/* put green led to steady if BT is disabled. Otherwise BT init will do it */
 	if (gpio_get_level(GPIO_BTOFF) == 0)
 		xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
-	ESP_LOGI("ADB", "ADB host started");
+	ESP_LOGI("ADB", "host started");
 
 	/* poll the mouse like a maniac. It will answer only if there is user input */
 	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 200, 0));
 
 	while (true) {
-		vTaskDelay(20 / portTICK_PERIOD_MS);
+		/* Should give us a polling rate between 80-90 Hz */
+		vTaskDelay(7 / portTICK_PERIOD_MS);
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
 		data = adb_rx_mouse();
 
@@ -184,7 +185,7 @@ static bool adb_rx_iszero(rmt_item32_t cell) {
 	return false;
 }
 
-static uint16_t	adb_rx_mouse() {
+static uint16_t	IRAM_ATTR adb_rx_mouse() {
 	uint16_t data = 0;
 	RingbufHandle_t rb = NULL;
 	rmt_item32_t* items = NULL;
@@ -194,9 +195,7 @@ static uint16_t	adb_rx_mouse() {
 	rmt_get_ringbuf_handle(RMT_RX_CHANNEL, &rb);
 	assert(rb != NULL);
 	rmt_rx_start(RMT_RX_CHANNEL, true);
-	items = (rmt_item32_t*) xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(10));
-
-	//printf( ">>> %i\n", rx_size);
+	items = (rmt_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
 	rmt_rx_stop(RMT_RX_CHANNEL);
 
 	if (items == NULL)
@@ -217,6 +216,7 @@ static uint16_t	adb_rx_mouse() {
 			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 			break;
 		default:
+			ESP_LOGD("ADB", "wrong size of %i bit(s)", rx_size / sizeof(rmt_item32_t));
 			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 	}
 
