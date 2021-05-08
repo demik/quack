@@ -43,13 +43,13 @@ extern TaskHandle_t t_click, t_qx, t_qy;
 
 /* static defines */
 static void	adb_handle_button(bool action);
-static bool adb_rx_isone(rmt_item32_t cell);
-static bool adb_rx_isstop(rmt_item32_t cell);
-static bool adb_rx_iszero(rmt_item32_t cell);
+static bool	adb_rx_isone(rmt_item32_t cell);
+static bool	adb_rx_isstop(rmt_item32_t cell);
+static bool	adb_rx_iszero(rmt_item32_t cell);
 static uint16_t	adb_rx_mouse();
-static void adb_rx_setup(void);
-static bool adb_rx_tlt(void);
-static void adb_tx_as(void);
+static void	adb_rx_setup(void);
+static bool	adb_rx_tlt(void);
+static void	adb_tx_as(void);
 static void	adb_tx_one(void);
 static void	adb_tx_setup(void);
 static void	adb_tx_zero(void);
@@ -67,7 +67,7 @@ static void	adb_handle_button(bool action) {
 	if (status == ADB_B_DOWN && action == ADB_B_UP) {
 		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
 		status = ADB_B_UP;
-		ESP_LOGD("ADB", "ADB button released");
+		ESP_LOGD("ADB", "button released");
 		return ;
 	}
 
@@ -75,7 +75,7 @@ static void	adb_handle_button(bool action) {
 	if (status == ADB_B_UP && action == ADB_B_DOWN) {
 		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
 		status = ADB_B_DOWN;
-		ESP_LOGD("ADB", "ADB button pressed");
+		ESP_LOGD("ADB", "button pressed");
 		return ;
 	}
 }
@@ -126,6 +126,7 @@ void	adb_task_host(void *pvParameters) {
 			else
 				adb_handle_button(ADB_B_UP);
 
+			/* cast negative signed 7 bits to signed 8 bits */
 			move = (data & ADB_CMD_MX) >> 0;
 			if (move & 0x40) {
 				move &= ~0x40;
@@ -152,11 +153,6 @@ void	adb_task_host(void *pvParameters) {
 void	adb_task_mouse(void *pvParameters) {
 	ESP_LOGI("ADB", "ADB mouse started");
 	vTaskSuspend(NULL);
-}
-
-int dur( uint32_t level, uint32_t duration ) {
-	if ( level == 0 ) { return duration; }
-	else { return -1.0 * duration; }
 }
 
 /*
@@ -207,8 +203,11 @@ static uint16_t	adb_rx_mouse() {
 		return 0;
 
 	/*
-	 * Mouse response size in bits is events / sizeof(rmt_item32_t) (4)
+ 	 * Mouse response size in bits is events / sizeof(rmt_item32_t) (4)
 	 * start bit + 16 data bits + stop bit = 72 bytes in RMT buffer (18 bits received)
+	 *
+	 * Check start / stop bits and size.
+	 * On real Macintoshes, ADB Manager does something similar
 	 */
 
 	switch (rx_size) {
@@ -241,7 +240,7 @@ static uint16_t	adb_rx_mouse() {
 			data |= 1;
 		//printf("%d:%dus %d:%dus ", (items+i)->level0, (items+i)->duration0, (items+i)->level1, (items+i)->duration1);
 	}
-	printf("\n");
+	//printf("\n");
 	vRingbufferReturnItem(rb, (void*) items);
 
 	return data;
