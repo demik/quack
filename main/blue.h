@@ -26,11 +26,19 @@
 #define BLUE_H
 
 /* defines */
-#define BLUE_SCAN_DURATION 8
+#define BLUE_SCAN_DURATION 6
 #define BLUE_SNIP "---8<------------------------------------------"
+
+/* button bitmasks */
+#define	BLUE_BUTTON_N 0
+#define	BLUE_BUTTON_1 (1 << 0)
+#define	BLUE_BUTTON_2 (1 << 1)
+#define	BLUE_BUTTON_3 (1 << 2)
+#define BLUE_BUTTON_E 0xF8		/* shouldn't happen */
 
 /* prototypes */
 void	blue_init(void);
+void	blue_input(esp_hidh_dev_t *dev, uint8_t  *data, uint16_t length);
 void    blue_close(esp_hidh_event_data_t *p);
 void    blue_open(esp_hidh_event_data_t *p);
 void    blue_scan(void *pvParameters);

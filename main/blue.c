@@ -31,17 +31,21 @@
 #include "gpio.h"
 #include "led.h"
 
-#define	BTMOUSE_BUTTON1	(1 << 0)
-#define	BTMOUSE_BUTTON2	(1 << 1)
-#define	BTMOUSE_BUTTON3	(1 << 2)
-#define BTMOUSE_BUTTONE 248
-
 /* debug tag */
 static const char *TAG = "blue";
 
+/* globals */
+extern TaskHandle_t t_click, t_qx, t_qy;
+
 /* private functions */
+static void	blue_handle_button(uint8_t buttons);
 static esp_hid_raw_report_map_t	*blue_hid_rm_get(esp_hidh_dev_t *dev);
 static esp_hid_report_item_t	blue_hid_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p);
+static void blue_set_boot_protocol(esp_hidh_dev_t *dev);
+static bool blue_support_boot_protocol(esp_hidh_dev_t *dev);
+
+/* direct calls to bluedroid */
+extern void BTA_HhSetProtoMode(uint8_t handle, uint8_t t_type);
 
 void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
@@ -86,11 +90,9 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
      * } feature;
      */
 
-	char	click;
-	short	x, y;
-
 	switch (event) {
         case ESP_HIDH_OPEN_EVENT: {
+			esp_hidh_dev_dump(param->open.dev, stdout);
             blue_open(param);
 			break;
 		}
@@ -101,14 +103,11 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 		}
 		case ESP_HIDH_INPUT_EVENT: {
             bda = esp_hidh_dev_bda_get(param->input.dev);
-						   ESP_LOGD(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
-						   ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
+						   //ESP_LOGD(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
+						   //ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
                            xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
-						   memcpy (&click, param->input.data, sizeof(uint8_t));
-						   click = click & (BTMOUSE_BUTTON1 | BTMOUSE_BUTTON2 | BTMOUSE_BUTTON3);
-						   if (click)
-							   ESP_LOGI(TAG, "CLICK: %d", click);
-							   break;
+			blue_input(param->input.dev, param->input.data, param->input.length);
+			break;
 					   }
 		case ESP_HIDH_FEATURE_EVENT: {
             bda = esp_hidh_dev_bda_get(param->feature.dev);
@@ -125,6 +124,45 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 	}
 }
 
+void blue_close(esp_hidh_event_data_t *p) {
+	const uint8_t *bda = NULL;
+
+	configASSERT(p != NULL);
+	bda = esp_hidh_dev_bda_get(p->close.dev);
+	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
+	esp_hidh_dev_free(p->close.dev);
+
+	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+}
+
+static void	blue_handle_button(uint8_t buttons) {
+	static bool	status = BLUE_BUTTON_N;	// Keep state
+
+	buttons = buttons & (BLUE_BUTTON_1 | BLUE_BUTTON_2 | BLUE_BUTTON_3);
+
+	if (status && buttons)
+		return ;
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N)
+		return ;
+
+	/* release button */
+	if (status && buttons == BLUE_BUTTON_N) {
+		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
+		status = 0;
+		ESP_LOGD(TAG, "button released");
+		return ;
+	}
+
+	/* press button */
+	if (status == BLUE_BUTTON_N && buttons) {
+		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
+		status = 1;
+		ESP_LOGD(TAG, "button pressed");
+		return ;
+	}
+
+}
+
 void blue_init(void)
 {
 	esp_err_t	ret;
@@ -135,7 +173,7 @@ void blue_init(void)
 		ret = nvs_flash_init();
 	}
 
-	ESP_LOGD(TAG, "Starting Bluetooth init");
+	ESP_LOGD(TAG, "Starting Bluetooth init on core %d", xPortGetCoreID());
 	ESP_ERROR_CHECK(ret);
 	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_BTDM));
 	ESP_ERROR_CHECK(esp_ble_gattc_register_callback(esp_hidh_gattc_event_handler));
@@ -148,6 +186,9 @@ void blue_init(void)
 	ESP_ERROR_CHECK(esp_hidh_init(&config));
 	esp_log_level_set("event", ESP_LOG_INFO);
 
+	/* complains about wrong data len on BOOT mode and CCONTROL */
+	esp_log_level_set("BT_HIDH", ESP_LOG_ERROR);
+
     /*
      * at this point, everything but bluetooth is started.
      * put green steady, start blinking blue and keep scanning until a device is found
@@ -158,15 +199,73 @@ void blue_init(void)
 	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
 }
 
-void blue_close(esp_hidh_event_data_t *p) {
-	const uint8_t *bda = NULL;
+/*
+ * data follows HID Mouse boot protocol format
+ *
+ * Byte | Bits | Description
+ * -----+------+---------------------------------------------------------------
+ * 0    | 0    | Button 1 (left)
+ * 0    | 1    | Button 2 (right)
+ * 0    | 2    | Button 3 (middle)
+ * 0    | 3-7  | Device specific, usually unused (0)
+ * 1    | 0-7  | X Displacement
+ * 2    | 0-7  | Y Displacement
+ * 3+   | 0-7  | Device specific, usually 3 is scroll wheel, usually unused (0)
+ */
 
-	configASSERT(p != NULL);
-	bda = esp_hidh_dev_bda_get(p->close.dev);
-	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
-	esp_hidh_dev_free(p->close.dev);
+void blue_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
+	uint8_t buttons;
+	uint8_t	i;
+	int8_t x, y;
 
-	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+	buttons = data[0];
+
+	/*
+	 * Do some checks before parsing data. We sould't get anything wrong in theory,
+	 * but we sometimes to get shit from either mouse or bluetooth stack
+	 *
+	 * Stack issue: https://github.com/espressif/esp-idf/issues/6985
+	 */
+
+	if (length < 3) {
+		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+		return;
+	}
+	if (buttons & BLUE_BUTTON_E) {
+		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+		return;
+	}
+
+	/*
+	 * we also want to ignore anything that contains scroll wheel & co for now
+	 * statistically theses are corrupted packets
+	 */
+
+	for (i = 3; i < length; i++) {
+		if (data[i]) {
+			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+			return;
+		}
+	}
+
+	blue_handle_button(buttons);
+
+	/* quadrature use 7 bits x/y offsets, bluetooth Boot use 8 bits */
+	x = data[1];
+	y = data[2];
+
+	if (x != 0) {
+		if (x == 1 || x == -1)
+			xTaskNotify(t_qx, x, eSetValueWithOverwrite);
+		else
+			xTaskNotify(t_qx, x / 2, eSetValueWithOverwrite);
+	}
+	if (y != 0) {
+		if (y == 1 || y == -1)
+			xTaskNotify(t_qy, y, eSetValueWithOverwrite);
+		else
+			xTaskNotify(t_qy, y / 2, eSetValueWithOverwrite);
+	}
 }
 
 void blue_open(esp_hidh_event_data_t *p) {
@@ -181,6 +280,8 @@ void blue_open(esp_hidh_event_data_t *p) {
 	/* search for MIR section */
 	esp_hid_raw_report_map_t *maps;
 	maps = blue_hid_rm_get(p->open.dev);
+
+	blue_set_boot_protocol(p->open.dev);
 	mir = blue_hid_ri_find(p->open.dev, ESP_HID_USAGE_MOUSE, ESP_HID_REPORT_TYPE_INPUT, ESP_HID_PROTOCOL_MODE_REPORT);
 
     xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
@@ -281,3 +382,64 @@ void blue_scan(void *pvParameters) {
 
     vTaskDelete(NULL);
 }
+
+static void blue_set_boot_protocol(esp_hidh_dev_t *dev) {
+	configASSERT(dev != NULL);
+
+	/*
+	 * /!\ Disclaimer /!\
+	 * This is ugly. We are accessing directly bluedroid and need the hidden handle to do that
+	 * Extract it from a private esp_hidh_dev_s struct and call BTA_HhSetProtoMode directly.
+	 */
+
+	struct decoy_dev_s {
+		struct esp_hidh_dev_s   *next;
+
+		esp_hid_device_config_t config;
+		esp_hid_usage_t         usage;
+		esp_hid_transport_t     transport;
+		bool                    connected;
+		bool                    opened;
+		int                     status;
+
+		size_t                  reports_len;
+		void                    *reports;
+
+		void                    *tmp;
+		size_t                  tmp_len;
+
+		xSemaphoreHandle        semaphore;
+
+		esp_err_t               (*close)        (esp_hidh_dev_t *dev);
+		esp_err_t               (*report_write) (esp_hidh_dev_t *dev, size_t map_index, size_t report_id, int report_type, uint8_t *data, size_t len);
+		esp_err_t               (*report_read)  (esp_hidh_dev_t *dev, size_t map_index, size_t report_id, int report_type, size_t max_length, uint8_t *value, size_t *value_len);
+		void                    (*dump)         (esp_hidh_dev_t *dev, FILE *fp);
+
+		uint8_t padding;		// for some reason, bda is off by one byte...
+		esp_bd_addr_t bda;
+
+		struct {
+			esp_bt_cod_t cod;
+			int handle;
+			uint8_t sub_class;
+			uint8_t app_id;
+			uint16_t attr_mask;
+		} bt;
+		TAILQ_ENTRY(esp_hidh_dev_s) devices;
+	};
+
+	struct decoy_dev_s *pass_that_handle;
+	pass_that_handle = (struct decoy_dev_s *)dev;
+
+	ESP_LOGI(TAG, "switching " ESP_BD_ADDR_STR " (%i) to protocol mode boot" ,
+			 pass_that_handle->bt.handle, ESP_BD_ADDR_HEX(pass_that_handle->bda));
+
+	//ESP_LOG_BUFFER_HEX(TAG, dev, sizeof(struct decoy));
+	/* bluedroid/bta/include/bta_hh_api.h */
+	BTA_HhSetProtoMode(pass_that_handle->bt.handle, 0x01);
+}
+
+static bool blue_support_boot_protocol(esp_hidh_dev_t *dev) {
+	configASSERT(dev != NULL);
+}
+

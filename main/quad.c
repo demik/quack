@@ -56,9 +56,6 @@ void	quad_init(void) {
 	xTaskCreate(quad_move_x, "QX", 4 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_qx);
 	xTaskCreate(quad_move_y, "QY", 4 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_qy);
 
-	printf(">>> T_QX %x\n", (unsigned int)t_qx);
-	printf(">>> T_QY %x\n", (unsigned int)t_qy);
-
 	/* click is active low */
 	gpio_set_level(GPIO_CLICK, 1);
 
@@ -102,7 +99,7 @@ void	quad_click(void *pvParameters) {
 	}
 }
 
-void	quad_move_x(void *pvParameters) {
+void IRAM_ATTR quad_move_x(void *pvParameters) {
 	unsigned int value = 0;
 	int	move = 0;
 	uint8_t i = 0;
@@ -135,7 +132,7 @@ void	quad_move_x(void *pvParameters) {
 	}
 }
 
-void	quad_move_y(void *pvParameters) {
+void IRAM_ATTR quad_move_y(void *pvParameters) {
 	unsigned int value = 0;
 	int	move = 0;
 	uint8_t i = 0;
