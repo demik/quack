@@ -36,6 +36,9 @@
 #include "led.h"
 #include "gpio.h"
 
+/* defines */
+#define TAG "ADB"
+
 /* globals */
 rmt_config_t adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
@@ -48,7 +51,6 @@ static bool	adb_rx_isstop(rmt_item32_t cell);
 static bool	adb_rx_iszero(rmt_item32_t cell);
 static uint16_t	IRAM_ATTR adb_rx_mouse();
 static void	adb_rx_setup(void);
-static bool	adb_rx_tlt(void);
 static void	adb_tx_as(void);
 static void	adb_tx_one(void);
 static void	adb_tx_setup(void);
@@ -67,7 +69,7 @@ static void	adb_handle_button(bool action) {
 	if (status == ADB_B_DOWN && action == ADB_B_UP) {
 		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
 		status = ADB_B_UP;
-		ESP_LOGD("ADB", "button released");
+		ESP_LOGD(TAG, "button released");
 		return ;
 	}
 
@@ -75,7 +77,7 @@ static void	adb_handle_button(bool action) {
 	if (status == ADB_B_UP && action == ADB_B_DOWN) {
 		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
 		status = ADB_B_DOWN;
-		ESP_LOGD("ADB", "button pressed");
+		ESP_LOGD(TAG, "button pressed");
 		return ;
 	}
 }
@@ -89,6 +91,7 @@ void	adb_init(void) {
 	esp_log_level_set("intr_alloc", ESP_LOG_INFO);
 
 	/* init RMT RX driver with default values for ADB  */
+	adb_rmt_rx.mem_block_num = 2;
 	adb_rmt_rx.rx_config.filter_en = true;
 	adb_rmt_rx.rx_config.filter_ticks_thresh = 10;
 	adb_rmt_rx.rx_config.idle_threshold = 100;
@@ -101,15 +104,72 @@ void	adb_init(void) {
 		xTaskCreatePinnedToCore(adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 }
 
+/*
+ * Probe ADB mouse. Also switch the mouse to a better mode if avaible
+ *
+ * 1. check if there is someting at address $3, if not: retry
+ * 2. try to switch to CLASSIC2 protocol at temporary address $9
+ * 3. if CLASSIC2 is successfull, move device back to $3
+ */
+
+void adb_probe(void) {
+	uint16_t	register3;
+
+	ESP_LOGI(TAG, "Probing for mouse...");
+	xTaskNotify(t_yellow, LED_SLOW, eSetValueWithOverwrite);
+
+	/* for some reason, RMT misses the first exchange sometimes. Flush the device should give it time */
+	adb_tx_cmd(ADB_MOUSE|ADB_FLUSH);
+	adb_rx_mouse();
+	vTaskDelay(12 / portTICK_PERIOD_MS);
+
+	while (true) {
+		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
+		register3 = adb_rx_mouse();
+		ESP_LOGD("ADB", "Device $3 register3: %x", register3);
+
+		if ((register3 & ADB_H_ALL) == ADB_H_C100) {
+			ESP_LOGI(TAG, "... detected mouse at $3");
+			break;
+		}
+
+		vTaskDelay(500 / portTICK_PERIOD_MS);
+	}
+
+	/* try to switch to 200cpi mode. (0x6000) == Exceptional event + Service request enable */
+	vTaskDelay(7 / portTICK_PERIOD_MS);
+	if ((register3 & ADB_H_ALL) == ADB_H_C100) {
+		adb_tx_listen(ADB_MOUSE|ADB_LISTEN|ADB_REG3, 0x6000|(ADB_MOUSE<<4)|ADB_H_C200);
+		vTaskDelay(7 / portTICK_PERIOD_MS);
+		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
+		register3 = adb_rx_mouse();
+	}
+
+	switch (register3 & ADB_H_ALL) {
+		case ADB_H_C100:
+			ESP_LOGD(TAG, "Mouse running at 100cpi");
+			break;
+		case ADB_H_C200:
+			ESP_LOGD(TAG, "Mouse running at 200cpi");
+			break;
+		default:
+			ESP_LOGE(TAG, "Mouse running with unknow handler: %x", register3 & ADB_H_ALL);
+	}
+
+	xTaskNotify(t_yellow, LED_OFF, eSetValueWithOverwrite);
+}
+
 void	adb_task_host(void *pvParameters) {
 	/* Classic Apple Mouse Protocol is 16 bits long */
 	uint16_t	data;
+	uint8_t		last = 0;
 	int8_t		move = 0;
+	uint8_t		state = ADB_S_PROBE;
 
 	/* put green led to steady if BT is disabled. Otherwise BT init will do it */
 	if (gpio_get_level(GPIO_BTOFF) == 0)
-		xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
-	ESP_LOGI("ADB", "host started");
+	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+	ESP_LOGI(TAG, "host started on core %d", xPortGetCoreID());
 
 	/* poll the mouse like a maniac. It will answer only if there is user input */
 	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 200, 0));
@@ -117,10 +177,19 @@ void	adb_task_host(void *pvParameters) {
 	while (true) {
 		/* Should give us a polling rate between 80-90 Hz */
 		vTaskDelay(7 / portTICK_PERIOD_MS);
+
+		if (state == ADB_S_PROBE) {
+			adb_probe();
+			state = ADM_S_POLL;
+			continue;
+		}
+
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG0);
 		data = adb_rx_mouse();
 
 		if (data) {
+			last = 0;
+
 			/* click is active low */
 			if (! (data & ADB_CMP_B1) || (! (data & ADB_CMP_B2)))
 				adb_handle_button(ADB_B_DOWN);
@@ -128,7 +197,7 @@ void	adb_task_host(void *pvParameters) {
 				adb_handle_button(ADB_B_UP);
 
 			/* cast negative signed 7 bits to signed 8 bits */
-			move = (data & ADB_CMD_MX) >> 0;
+			move = (data & ADB_CMP_MX) >> 0;
 			if (move & 0x40) {
 				move &= ~0x40;
 				move |= 0x80;
@@ -138,7 +207,7 @@ void	adb_task_host(void *pvParameters) {
 			if (move)
 				xTaskNotify(t_qx, move, eSetValueWithOverwrite);
 
-			move = (data & ADB_CMD_MY) >> 8;
+			move = (data & ADB_CMP_MY) >> 8;
 			if (move & 0x40) {
 				move &= ~0x40;
 				move |= 0x80;
@@ -148,11 +217,25 @@ void	adb_task_host(void *pvParameters) {
 			if (move)
 				xTaskNotify(t_qy, move, eSetValueWithOverwrite);
 		}
+		else {
+			last++;
+			if (last == 0xff) {
+				adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
+				data = adb_rx_mouse();
+				if (!data) {
+					if (state == ADB_S_KEEP)
+						state = ADB_S_PROBE;
+					else
+						state = ADB_S_KEEP;
+				}
+				ESP_LOGD("ADB", "Check mouse presence %x", data);
+			}
+		}
 	}
 }
 
 void	adb_task_mouse(void *pvParameters) {
-	ESP_LOGI("ADB", "ADB mouse started");
+	ESP_LOGI(TAG, "mouse started on core %d", xPortGetCoreID());
 	vTaskSuspend(NULL);
 }
 
@@ -193,7 +276,7 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 	size_t i;
 
 	rmt_get_ringbuf_handle(RMT_RX_CHANNEL, &rb);
-	assert(rb != NULL);
+	configASSERT(rb != NULL);
 	rmt_rx_start(RMT_RX_CHANNEL, true);
 	items = (rmt_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
 	rmt_rx_stop(RMT_RX_CHANNEL);
@@ -212,11 +295,14 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 	switch (rx_size) {
 		case 0:
 			return 0;
+		case 4:
+			/* single glitch, go timeout */
+			return 0;
 		case 72:
 			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 			break;
 		default:
-			ESP_LOGD("ADB", "wrong size of %i bit(s)", rx_size / sizeof(rmt_item32_t));
+			ESP_LOGD(TAG, "wrong size of %i bit(s)", rx_size / sizeof(rmt_item32_t));
 			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 	}
 
@@ -261,11 +347,11 @@ static inline void	adb_tx_as() {
 	ets_delay_us(80-1);
 }
 
-void	adb_tx_cmd(unsigned char cmd) {
+void IRAM_ATTR adb_tx_cmd(unsigned char cmd) {
 	adb_tx_setup();
 	adb_tx_as();
 
-	/* send actual byte (unrolled loop) */
+	/* send command byte (unrolled loop) */
 	cmd & 0x80 ? adb_tx_one() : adb_tx_zero();
 	cmd & 0x40 ? adb_tx_one() : adb_tx_zero();
 	cmd & 0x20 ? adb_tx_one() : adb_tx_zero();
@@ -278,6 +364,42 @@ void	adb_tx_cmd(unsigned char cmd) {
 	/* stop bit */
 	adb_tx_zero();
 	adb_rx_setup();
+}
+
+void IRAM_ATTR adb_tx_data(uint16_t data) {
+	adb_tx_setup();
+
+	adb_tx_one();
+
+	/* send data 2 bytes (unrolled loop) */
+	data & 0x8000 ? adb_tx_one() : adb_tx_zero();
+	data & 0x4000 ? adb_tx_one() : adb_tx_zero();
+	data & 0x2000 ? adb_tx_one() : adb_tx_zero();
+	data & 0x1000 ? adb_tx_one() : adb_tx_zero();
+	data & 0x800 ? adb_tx_one() : adb_tx_zero();
+	data & 0x400 ? adb_tx_one() : adb_tx_zero();
+	data & 0x200 ? adb_tx_one() : adb_tx_zero();
+	data & 0x100 ? adb_tx_one() : adb_tx_zero();
+	data & 0x80 ? adb_tx_one() : adb_tx_zero();
+	data & 0x40 ? adb_tx_one() : adb_tx_zero();
+	data & 0x20 ? adb_tx_one() : adb_tx_zero();
+	data & 0x10 ? adb_tx_one() : adb_tx_zero();
+	data & 0x08 ? adb_tx_one() : adb_tx_zero();
+	data & 0x04 ? adb_tx_one() : adb_tx_zero();
+	data & 0x02 ? adb_tx_one() : adb_tx_zero();
+	data & 0x01 ? adb_tx_one() : adb_tx_zero();
+
+	/* stop bit */
+	adb_tx_zero();
+	adb_rx_setup();
+}
+
+void	adb_tx_listen(unsigned char cmd, uint16_t data) {
+	adb_tx_cmd(cmd);
+
+	/* Stop to start is between 160-240µS. Go for around 160 + time for GPIO setup */
+	ets_delay_us(160);
+	adb_tx_data(data);
 }
 
 static inline void	adb_tx_one() {

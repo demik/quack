@@ -31,6 +31,8 @@ void    adb_task_host(void *pvParameters);
 void    adb_task_mouse(void *pvParameters);
 
 void	adb_tx_cmd(unsigned char cmd);
+void	adb_tx_data(uint16_t data);
+void	adb_tx_listen(unsigned char cmd, uint16_t data);
 void	adb_tx_reset(void);
 
 /* defines */
@@ -47,18 +49,32 @@ void	adb_tx_reset(void);
 /* Classic Apple Mouse Protocol bitmasks */
 #define ADB_CMP_B1	(1<<15)
 #define ADB_CMP_B2	(1<<7)
-#define ADB_CMD_MX	(127<<0)
-#define ADB_CMD_MY	(127<<8)
+#define ADB_CMP_MX	(127<<0)
+#define ADB_CMP_MY	(127<<8)
 
 /* ADB commands values from 00591b.pdf page 16-17 */
-#define ADB_MOUSE	(3<<4)
 #define ADB_TALK	0xC
 #define ADB_LISTEN	0x8
+#define ADB_FLUSH	0x1
 #define ADB_REG0	0x0
 #define ADB_REG3	0x3
+
+/* Device addresses */
+#define ADB_MOUSE	(3<<4)
+#define ADB_TMP		(9<<4)
 
 /* Various stuff */
 #define ADB_B_UP	0
 #define ADB_B_DOWN	1
+
+#define ADB_H_ALL	0xff	// Handlers bitmask
+#define ADB_H_C100	0x01	// Handler 1 (Classic @ 100cpi)
+#define ADB_H_C200	0x02	// Handler 2 (Classic @ 200cpi)
+#define ADB_H_MOVE	0xfe	// Move to another address
+
+/* Host states */
+#define ADB_S_PROBE		0x00
+#define ADM_S_POLL		0x01
+#define ADB_S_KEEP		0x08
 
 #endif
