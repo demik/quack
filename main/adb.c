@@ -344,7 +344,7 @@ static inline void	adb_tx_as() {
 	gpio_set_level(GPIO_ADB, 0);
 	ets_delay_us(800-1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(80-1);
+	ets_delay_us(70-1);
 }
 
 void IRAM_ATTR adb_tx_cmd(unsigned char cmd) {
