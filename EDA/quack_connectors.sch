@@ -5,8 +5,8 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 2 2
 Title "Quack Mouse Adapter"
-Date "2021-04-17"
-Rev "1.3"
+Date "2021-06-08"
+Rev "1.4"
 Comp "Lostwave"
 Comment1 "https://68kmla.org"
 Comment2 "https://github.com/demik/quack/tree/master/EDA"
@@ -418,8 +418,6 @@ F 3 "https://assets.nexperia.com/documents/data-sheet/74LVC_LVCH2T45.pdf" H 5750
 	1    5500 1850
 	1    0    0    -1  
 $EndComp
-Wire Wire Line
-	5900 1750 7900 1750
 NoConn ~ 5100 1950
 NoConn ~ 5900 1950
 $Comp
@@ -786,7 +784,6 @@ Wire Wire Line
 	7900 950  7900 1050
 Wire Wire Line
 	7900 1450 7900 1750
-Connection ~ 7900 1750
 Wire Wire Line
 	7900 1750 9050 1750
 Text Notes 7250 750  0    50   Italic 0
@@ -847,4 +844,52 @@ Wire Notes Line
 	1000 6000 1000 4500
 Text Notes 1150 5850 0    50   ~ 0
 Mouting holes
+$Comp
+L Device:R R8
+U 1 1 60C00D36
+P 6750 1750
+F 0 "R8" V 6543 1750 50  0000 C CNN
+F 1 "22" V 6634 1750 50  0000 C CNN
+F 2 "Resistor_SMD:R_0805_2012Metric" V 6680 1750 50  0001 C CNN
+F 3 "~" H 6750 1750 50  0001 C CNN
+	1    6750 1750
+	0    1    1    0   
+$EndComp
+Wire Wire Line
+	6900 1750 7900 1750
+Connection ~ 7900 1750
+Wire Wire Line
+	6600 1750 5900 1750
+$Comp
+L Mechanical:MountingHole H5
+U 1 1 60C30146
+P 1500 7000
+F 0 "H5" H 1600 7046 50  0000 L CNN
+F 1 "1.152mm" H 1500 6850 50  0000 L CNN
+F 2 "MountingHole_Tooling:MountingHole_1.152mm" H 1500 7000 50  0001 C CNN
+F 3 "~" H 1500 7000 50  0001 C CNN
+	1    1500 7000
+	1    0    0    -1  
+$EndComp
+$Comp
+L Mechanical:MountingHole H6
+U 1 1 60C324D8
+P 2000 7000
+F 0 "H6" H 2100 7046 50  0000 L CNN
+F 1 "1.152mm" H 2000 6850 50  0000 L CNN
+F 2 "MountingHole_Tooling:MountingHole_1.152mm" H 2000 7000 50  0001 C CNN
+F 3 "~" H 2000 7000 50  0001 C CNN
+	1    2000 7000
+	1    0    0    -1  
+$EndComp
+Wire Notes Line
+	1000 6500 2500 6500
+Wire Notes Line
+	2500 6500 2500 7500
+Wire Notes Line
+	2500 7500 1000 7500
+Wire Notes Line
+	1000 7500 1000 6500
+Text Notes 1150 7350 0    50   ~ 0
+Tooling Holes
 $EndSCHEMATC

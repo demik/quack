@@ -1,3 +1,10 @@
+## PCB 1.4
+- added resistor on pulldown to match 68040 Macs.
+- tone down LEDs again again again.
+- Silkscreen corrections
+- added Open Hardware logo
+- added tooling holes
+
 ## PCB 1.3
 - testing blue PCB
 - replaced RXS0108EPWR by 74LVC2T45 + 74LVC4245
