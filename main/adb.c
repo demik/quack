@@ -31,9 +31,6 @@
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "driver/rmt.h"
-#include "driver/periph_ctrl.h"
-#include "soc/periph_defs.h"
-#include "soc/rmt_reg.h"
 
 #include "adb.h"
 #include "led.h"
@@ -49,7 +46,6 @@ extern TaskHandle_t t_click, t_qx, t_qy;
 
 /* static defines */
 static void	adb_handle_button(bool action);
-static void adb_rmt_reset(void);
 static bool	adb_rx_isone(rmt_item32_t cell);
 static bool	adb_rx_isstop(rmt_item32_t cell);
 static bool	adb_rx_iszero(rmt_item32_t cell);

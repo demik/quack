@@ -30,6 +30,7 @@
 #include "blue.h"
 #include "gpio.h"
 #include "led.h"
+#include "m4848.h"
 
 /* debug tag */
 static const char *TAG = "blue";
