@@ -170,7 +170,7 @@ void adb_probe(void) {
  * Somewhat a hack, but resetting the module sometimes help.
  */
 
-void	adb_rmt_reset() {
+static void	adb_rmt_reset() {
 	periph_module_reset(PERIPH_RMT_MODULE);
 	rmt_config(&adb_rmt_rx);
 	xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
@@ -300,7 +300,7 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 	configASSERT(rb != NULL);
 	rmt_rx_start(RMT_RX_CHANNEL, true);
 	items = (rmt_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
-	rmt_status = RMT.status_ch[RMT_RX_CHANNEL];
+	rmt_get_status(RMT_RX_CHANNEL, &rmt_status);
 	if (((rmt_status >> RMT_STATE_CH0_S) & RMT_STATE_CH0_V) == 4)
 		adb_rmt_reset();
 	rmt_rx_stop(RMT_RX_CHANNEL);
@@ -321,7 +321,6 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 			/* RMT giving back a buffer with a rx_size of 0… */
 		case 4:
 			/* single glitch or service request (keyboard), timeout/ignore */
-			rmt_memory_rw_rst(RMT_RX_CHANNEL);
 			vRingbufferReturnItem(rb, (void*) items);
 			return 0;
 		case 72:
