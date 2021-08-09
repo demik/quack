@@ -31,6 +31,9 @@
 #include "esp_system.h"
 #include "esp_spi_flash.h"
 #include "driver/rmt.h"
+#include "driver/periph_ctrl.h"
+#include "soc/periph_defs.h"
+#include "soc/rmt_reg.h"
 
 #include "adb.h"
 #include "led.h"
@@ -46,6 +49,7 @@ extern TaskHandle_t t_click, t_qx, t_qy;
 
 /* static defines */
 static void	adb_handle_button(bool action);
+static void adb_rmt_reset(void);
 static bool	adb_rx_isone(rmt_item32_t cell);
 static bool	adb_rx_isstop(rmt_item32_t cell);
 static bool	adb_rx_iszero(rmt_item32_t cell);
@@ -87,7 +91,7 @@ void	adb_init(void) {
 	gpio_set_level(GPIO_ADB, 1);
 	adb_tx_reset();
 
-	/* avoir console flood when installing/uninstalling RMT driver */
+	/* avoid console flood when installing/uninstalling RMT driver */
 	esp_log_level_set("intr_alloc", ESP_LOG_INFO);
 
 	/* init RMT RX driver with default values for ADB  */
@@ -159,6 +163,22 @@ void adb_probe(void) {
 	xTaskNotify(t_yellow, LED_OFF, eSetValueWithOverwrite);
 }
 
+/*
+ * sometimes the RMT device get stuck with a full RX buffer. On the Quack Mouse adapter,
+ * it prevends reading from the ADB if the receive buffer has been filled
+ *
+ * Somewhat a hack, but resetting the module sometimes help.
+ */
+
+void	adb_rmt_reset() {
+	periph_module_reset(PERIPH_RMT_MODULE);
+	rmt_config(&adb_rmt_rx);
+	xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+
+	gpio_set_level(GPIO_ADB, 1);
+	adb_tx_reset();
+}
+
 void	adb_task_host(void *pvParameters) {
 	/* Classic Apple Mouse Protocol is 16 bits long */
 	uint16_t	data;
@@ -172,7 +192,7 @@ void	adb_task_host(void *pvParameters) {
 	ESP_LOGI(TAG, "host started on core %d", xPortGetCoreID());
 
 	/* poll the mouse like a maniac. It will answer only if there is user input */
-	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 200, 0));
+	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 256, 0));
 
 	while (true) {
 		/* Should give us a polling rate between 80-90 Hz */
@@ -269,6 +289,7 @@ static bool adb_rx_iszero(rmt_item32_t cell) {
 }
 
 static uint16_t	IRAM_ATTR adb_rx_mouse() {
+	uint32_t rmt_status;
 	uint16_t data = 0;
 	RingbufHandle_t rb = NULL;
 	rmt_item32_t* items = NULL;
@@ -279,6 +300,9 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 	configASSERT(rb != NULL);
 	rmt_rx_start(RMT_RX_CHANNEL, true);
 	items = (rmt_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
+	rmt_status = RMT.status_ch[RMT_RX_CHANNEL];
+	if (((rmt_status >> RMT_STATE_CH0_S) & RMT_STATE_CH0_V) == 4)
+		adb_rmt_reset();
 	rmt_rx_stop(RMT_RX_CHANNEL);
 
 	if (items == NULL)
@@ -294,7 +318,7 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 
 	switch (rx_size) {
 		case 0:
-			return 0;
+			/* RMT giving back a buffer with a rx_size of 0… */
 		case 4:
 			/* single glitch or service request (keyboard), timeout/ignore */
 			rmt_memory_rw_rst(RMT_RX_CHANNEL);
