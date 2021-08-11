@@ -105,7 +105,7 @@ void	adb_init(void) {
 	if (gpio_get_level(GPIO_ADBSRC) == 0)
 		xTaskCreatePinnedToCore(adb_task_host, "ADB_HOST", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 	else
-		xTaskCreatePinnedToCore(adb_task_mouse, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
+		xTaskCreatePinnedToCore(adb_task_idle, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 }
 
 /*
@@ -254,8 +254,25 @@ void	adb_task_host(void *pvParameters) {
 	}
 }
 
-void	adb_task_mouse(void *pvParameters) {
-	ESP_LOGI(TAG, "mouse started on core %d", xPortGetCoreID());
+/*
+ * this do nothing since device mode doesn't work
+ * put GPIO and Level converter on output mode and set everything low
+ */
+
+void	adb_task_idle(void *pvParameters) {
+	ESP_LOGI(TAG, "idle started on core %d", xPortGetCoreID());
+
+	/* RMT is not installed via rmt_driver_install() so no need to uninstall */
+	adb_tx_setup();
+	gpio_set_level(GPIO_ADB, 0);
+
+	/*
+	 * We sould exit here but for some reason core 1 panic with
+	 * IllegalInstruction if we do... Dunno what's going on here either.
+	 * let's suspend the task instead
+	 */
+
+	ESP_LOGI(TAG, "idle suspending itself on core %d", xPortGetCoreID());
 	vTaskSuspend(NULL);
 }
 

@@ -28,7 +28,7 @@
 /* prototypes */
 void	adb_init(void);
 void    adb_task_host(void *pvParameters);
-void    adb_task_mouse(void *pvParameters);
+void    adb_task_idle(void *pvParameters);
 
 void	adb_tx_cmd(unsigned char cmd);
 void	adb_tx_data(uint16_t data);
