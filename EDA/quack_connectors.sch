@@ -5,7 +5,7 @@ $Descr A4 11693 8268
 encoding utf-8
 Sheet 2 2
 Title "Quack Mouse Adapter"
-Date "2021-06-08"
+Date "2021-08-15"
 Rev "1.4"
 Comp "Lostwave"
 Comment1 "https://68kmla.org"
