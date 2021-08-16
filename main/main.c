@@ -77,7 +77,7 @@ void app_main(void)
 
 	/* put LED error ON if no inputs (/BTOFF and no /ADBSRC) */
 	if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {
-		ESP_LOGE(TAG, "Bluetooth is off and ADB is in device mode!");
+		ESP_LOGE(TAG, "Bluetooth is off and ADB is NOT in host mode!");
 		xTaskNotify(t_red, LED_ON, eSetValueWithOverwrite);
 	}
 }

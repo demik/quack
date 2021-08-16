@@ -26,6 +26,7 @@
 #define LED_H
 
 /* prototypes */
+void	led_dispatch(void *pvParameters);
 void	led_init(void);
 void    led_task(void *pvParameters);
 
@@ -35,6 +36,11 @@ void    led_task(void *pvParameters);
 #define LED_ONCE	(1 << 2)
 #define LED_SLOW	(1 << 3)
 #define LED_FAST	(1 << 4)
+
+#define LED_DUTY	4096
+
+#define LED_CHANNEL(c)	ledc_channel[c - 20].channel
+#define LED_SPEED(c)	ledc_channel[c - 20].speed_mode
 
 #endif
 

@@ -68,5 +68,7 @@ void    gpio_output_enable(void);
 #define GPIO_YELLOWLED	26
 #define GPIO_REDLED		27
 
+#define GPIO_NULL		5
+
 #endif
 
