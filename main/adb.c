@@ -102,10 +102,17 @@ void	adb_init(void) {
 	rmt_config(&adb_rmt_rx);
 
 	/* If jumper is set, switch to ADB host mode */
-	if (gpio_get_level(GPIO_ADBSRC) == 0)
+	if (adb_is_host())
 		xTaskCreatePinnedToCore(adb_task_host, "ADB_HOST", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 	else
 		xTaskCreatePinnedToCore(adb_task_idle, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
+}
+
+inline bool	adb_is_host(void) {
+	if (gpio_get_level(GPIO_ADBSRC) == 0)
+		return true;
+	else
+		return false;
 }
 
 /*
@@ -366,9 +373,7 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 
 		if (adb_rx_isone(*(items+i)))
 			data |= 1;
-		//printf("%d:%dus %d:%dus ", (items+i)->level0, (items+i)->duration0, (items+i)->level1, (items+i)->duration1);
 	}
-	//printf("\n");
 	vRingbufferReturnItem(rb, (void*) items);
 
 	return data;

@@ -27,6 +27,7 @@
 
 /* prototypes */
 void	adb_init(void);
+bool	adb_is_host(void);
 void    adb_task_host(void *pvParameters);
 void    adb_task_idle(void *pvParameters);
 
