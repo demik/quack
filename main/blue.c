@@ -1,7 +1,22 @@
-/* This example code is in the Public Domain (or CC0 licensed, at your option.)
-   Unless required by applicable law or agreed to in writing, this software is
-   distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
+/*
+ *  blue.c
+ *  quack
+ *
+ *  Created by Michel DEPEIGE on 18/07/2021.
+ *  Copyright (c) 2021 Michel DEPEIGE.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the Apache License, Version 2.0 (the "License");
+ * You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
  */
 
 #include <stdio.h>
@@ -24,6 +39,7 @@
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
 
+#include "esp_hidd.h"
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
 
@@ -37,19 +53,162 @@
 static const char *TAG = "blue";
 
 /* globals */
+TaskHandle_t t_adb2hid;
 extern TaskHandle_t t_click, t_qx, t_qy;
+static esp_hidd_dev_t *hid_dev = NULL;
 
 /* private functions */
+static void blue_d_init(void);
+static void blue_d_start(void);
 void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data);
+static void blue_h_init(void);
+static esp_hid_report_item_t blue_h_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p);
 static void	blue_handle_button(uint8_t buttons);
 static esp_hid_raw_report_map_t	*blue_hid_rm_get(esp_hidh_dev_t *dev);
-static esp_hid_report_item_t	blue_h_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p);
-static void blue_set_boot_protocol(esp_hidh_dev_t *dev);
+void blue_set_boot_protocol(esp_hidh_dev_t *dev);
 static bool blue_support_boot(esp_hidh_dev_t *dev);
 
 /* direct calls to bluedroid */
 extern void BTA_HhSetProtoMode(uint8_t handle, uint8_t t_type);
 
+/* Device specific functions blue_d_* */
+static void blue_d_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+{
+	esp_hidd_event_t event = (esp_hidd_event_t)id;
+	esp_hidd_event_data_t *param = (esp_hidd_event_data_t *)event_data;
+
+	switch (event) {
+		case ESP_HIDD_START_EVENT: {
+			blue_d_start();
+			break;
+		}
+		case ESP_HIDD_CONNECT_EVENT: {
+			ESP_LOGI(TAG, "CONNECT");
+			xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
+			break;
+		}
+		case ESP_HIDD_PROTOCOL_MODE_EVENT: {
+			ESP_LOGI(TAG, "PROTOCOL MODE[%u]: %s", param->protocol_mode.map_index, param->protocol_mode.protocol_mode ? "REPORT" : "BOOT");
+			break;
+		}
+		case ESP_HIDD_CONTROL_EVENT: {
+			ESP_LOGI(TAG, "CONTROL[%u]: %sSUSPEND", param->control.map_index, param->control.control ? "EXIT_" : "");
+			break;
+		}
+		case ESP_HIDD_OUTPUT_EVENT: {
+			ESP_LOGI(TAG, "OUTPUT[%u]: %8s ID: %2u, Len: %d, Data:", param->output.map_index, esp_hid_usage_str(param->output.usage), param->output.report_id, param->output.length);
+			ESP_LOG_BUFFER_HEX(TAG, param->output.data, param->output.length);
+			break;
+		}
+		case ESP_HIDD_FEATURE_EVENT: {
+			ESP_LOGI(TAG, "FEATURE[%u]: %8s ID: %2u, Len: %d, Data:", param->feature.map_index, esp_hid_usage_str(param->feature.usage), param->feature.report_id, param->feature.length);
+			ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
+			break;
+		}
+		case ESP_HIDD_DISCONNECT_EVENT: {
+			ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
+			esp_hid_ble_gap_adv_start();
+			xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+			break;
+		}
+		case ESP_HIDD_STOP_EVENT: {
+			ESP_LOGI(TAG, "STOP");
+			break;
+		}
+		default:
+			break;
+	}
+	return;
+}
+
+static void blue_d_init() {
+	esp_err_t	ret;
+
+	ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_MOUSE, m4848_config.device_name);
+	ESP_ERROR_CHECK( ret );
+
+	if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {
+		ESP_LOGE(TAG, "GATTS register callback failed: %d", ret);
+		return;
+	}
+
+	ESP_ERROR_CHECK(esp_hidd_dev_init(&m4848_config, ESP_HID_TRANSPORT_BLE, blue_d_callback, &hid_dev));
+
+	vTaskDelay(10000 / portTICK_PERIOD_MS);
+	xTaskCreate(blue_adb2hid, "ADB2BT", 2 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_adb2hid);
+}
+
+/*
+ * Called when the ESP HIS stack is started
+ * Start advertising our Bluetooth stuff
+ */
+
+static void blue_d_start()
+{
+	ESP_LOGD(TAG, "Bluetooth Mouse started");
+	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+	esp_hid_ble_gap_adv_start();
+}
+
+/*
+ * Called by the ADB stack from adb_task_host on mouse activity
+ * Convert the 16bit ADB data to a 3 bytes HID INPUT REPORT matching the m4848
+ */
+
+void	blue_adb2hid(void *pvParameters) {
+	uint16_t data = 0;
+	uint8_t buffer[3] = {0, 0, 0};
+	int8_t move = 0;
+	unsigned int tmp;
+
+	ESP_LOGD(TAG, "ADB2BT started on core %d", xPortGetCoreID());
+
+	while (true) {
+		xTaskNotifyWait(0, 0, &tmp, portMAX_DELAY);
+		data = (uint16_t)tmp;
+
+		/* button pressed */
+		if (! (data & ADB_CMP_B1) || (! (data & ADB_CMP_B2)))
+			buffer[0] = (1<<0);
+		else
+			buffer[0] = 0;
+
+		/*
+		 * cast negative signed 7 bits to signed 8 bits
+		 * then apply a slight acceleration (x^1.2)
+		 */
+
+		move = (data & ADB_CMP_MX) >> 0;
+		if (move & 0x40) {
+			move &= ~0x40;
+			move |= 0x80;
+			move += 64;
+			move *= -1;
+			buffer[1] = m4848_accel[move];
+			buffer[1] = buffer[1] * -1;
+		}
+		else {
+			buffer[1] = m4848_accel[move];
+		}
+
+		move = (data & ADB_CMP_MY) >> 8;
+		if (move & 0x40) {
+			move &= ~0x40;
+			move |= 0x80;
+			move += 64;
+			move *= -1;
+			buffer[2] = m4848_accel[move];
+			buffer[2] = buffer[2] * -1;
+		}
+		else {
+			buffer[2] = m4848_accel[move];
+		}
+
+		esp_hidd_dev_input_set(hid_dev, 1, 0, buffer, 3);
+	}
+}
+
+/* Host specific functions blue_h_* */
 void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
 	esp_hidh_event_t event = (esp_hidh_event_t)id;
@@ -71,9 +230,8 @@ void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void
 		}
 		case ESP_HIDH_INPUT_EVENT: {
 			bda = esp_hidh_dev_bda_get(param->input.dev);
-						   //ESP_LOGD(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
-						   //ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
-						   xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
+			ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
+			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 			blue_h_input(param->input.dev, param->input.data, param->input.length);
 			break;
 					   }
@@ -131,6 +289,21 @@ static void	blue_handle_button(uint8_t buttons) {
 
 }
 
+static void blue_h_init(void) {
+	esp_hidh_config_t config = {
+		.callback = blue_h_callback,
+		.event_stack_size = 4096
+	};
+
+	ESP_ERROR_CHECK(esp_hidh_init(&config));
+
+	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
+}
+
+/*
+ * Bluetooth common init: init module and various stuff
+ * Host or Device specific inits go in blue_d_init() or blue_h_init()
+ */
 void blue_init(void)
 {
 	esp_err_t	ret;
@@ -147,14 +320,7 @@ void blue_init(void)
 	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_BTDM));
 	ESP_ERROR_CHECK(esp_ble_gattc_register_callback(esp_hidh_gattc_event_handler));
 
-	esp_hidh_config_t config = {
-		.callback = blue_h_callback,
-		.event_stack_size = 4096
-	};
-
-	ESP_ERROR_CHECK(esp_hidh_init(&config));
 	esp_log_level_set("event", ESP_LOG_INFO);
-
 	/* complains about wrong data len on BOOT mode and CCONTROL */
 	esp_log_level_set("BT_HIDH", ESP_LOG_ERROR);
 
@@ -165,7 +331,11 @@ void blue_init(void)
 
     xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
     xTaskNotify(t_blue, LED_FAST, eSetValueWithOverwrite);
-	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
+
+	if (adb_is_host())
+		blue_d_init();
+	else
+		blue_h_init();
 }
 
 /*
@@ -351,7 +521,7 @@ void blue_scan(void *pvParameters) {
     vTaskDelete(NULL);
 }
 
-static void blue_set_boot_protocol(esp_hidh_dev_t *dev) {
+void blue_set_boot_protocol(esp_hidh_dev_t *dev) {
 	configASSERT(dev != NULL);
 
 	/*

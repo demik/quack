@@ -6,19 +6,16 @@
  *  Copyright (c) 2020 Michel DEPEIGE.
  *
  * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2, or (at your option)
- * any later version.
+ * it under the terms of the Apache License, Version 2.0 (the "License");
+ * You may obtain a copy of the License at:
  *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
- * You should have received a copy of the GNU General Public License
- * along with this program (see the file COPYING); if not, write to the
- * Free Software Foundation, Inc.,
- * 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  *
  */
 
@@ -44,6 +41,7 @@
 
 /* globals */
 rmt_config_t adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
+extern TaskHandle_t t_adb2hid;
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
 extern TaskHandle_t t_click, t_qx, t_qy;
 
@@ -216,6 +214,10 @@ void	adb_task_host(void *pvParameters) {
 
 		if (data) {
 			last = 0;
+
+			/* split data for quad and (maybe) bluetooth */
+			if (gpio_get_level(GPIO_BTOFF) == 1 && t_adb2hid != NULL)
+				xTaskNotify(t_adb2hid, data, eSetValueWithOverwrite);
 
 			/* click is active low */
 			if (! (data & ADB_CMP_B1) || (! (data & ADB_CMP_B2)))
