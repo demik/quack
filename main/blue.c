@@ -27,6 +27,7 @@
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
 
+#include "adb.h"
 #include "blue.h"
 #include "gpio.h"
 #include "led.h"
@@ -39,62 +40,28 @@ static const char *TAG = "blue";
 extern TaskHandle_t t_click, t_qx, t_qy;
 
 /* private functions */
+void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data);
 static void	blue_handle_button(uint8_t buttons);
 static esp_hid_raw_report_map_t	*blue_hid_rm_get(esp_hidh_dev_t *dev);
-static esp_hid_report_item_t	blue_hid_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p);
+static esp_hid_report_item_t	blue_h_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p);
 static void blue_set_boot_protocol(esp_hidh_dev_t *dev);
-static bool blue_support_boot_protocol(esp_hidh_dev_t *dev);
+static bool blue_support_boot(esp_hidh_dev_t *dev);
 
 /* direct calls to bluedroid */
 extern void BTA_HhSetProtoMode(uint8_t handle, uint8_t t_type);
 
-void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
 {
 	esp_hidh_event_t event = (esp_hidh_event_t)id;
 	esp_hidh_event_data_t *param = (esp_hidh_event_data_t *)event_data;
 
-    const uint8_t *bda = NULL;
+	const uint8_t *bda = NULL;
 
-	/*
-     * esp_hidh_event_data_t = union
-     *
-     * struct {
-     *     esp_hidh_dev_t *dev;     // HID Remote bluetooth device
-     * } open;
-     *
-     * struct {
-     *     esp_hidh_dev_t *dev;     // HID Remote bluetooth device
-     *     int reason;              // Reason why the connection was closed. BLE Only
-     * } close;
-     *
-     * struct {
-     *     esp_hidh_dev_t *dev;     // HID Remote bluetooth device
-     *     uint8_t level;           // Battery Level (0-100%)
-     * } battery;
-     *
-     * struct {
-     *     esp_hidh_dev_t *dev;     // HID Remote bluetooth device
-     *     esp_hid_usage_t usage;   // HID report usage
-     *     uint16_t report_id;      // HID report index
-     *     uint16_t length;         // HID data length
-     *     uint8_t  *data;          // The pointer to the HID data
-     *     uint8_t map_index;       // HID report map index
-     * } input;
-     *
-     * struct {
-     *     esp_hidh_dev_t *dev;     // HID Remote bluetooth device
-     *     esp_hid_usage_t usage;   // HID report usage
-     *     uint16_t report_id;      // HID report index
-     *     uint16_t length;         // HID data length
-     *     uint8_t  *data;          // The pointer to the HID data
-     *     uint8_t map_index;       // HID report map index
-     * } feature;
-     */
-
+	/* union described in include/esp_hidh.h */
 	switch (event) {
-        case ESP_HIDH_OPEN_EVENT: {
+		case ESP_HIDH_OPEN_EVENT: {
 			esp_hidh_dev_dump(param->open.dev, stdout);
-            blue_open(param);
+			blue_h_open(param);
 			break;
 		}
 		case ESP_HIDH_BATTERY_EVENT: {
@@ -103,21 +70,21 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 			break;
 		}
 		case ESP_HIDH_INPUT_EVENT: {
-            bda = esp_hidh_dev_bda_get(param->input.dev);
+			bda = esp_hidh_dev_bda_get(param->input.dev);
 						   //ESP_LOGD(TAG, ESP_BD_ADDR_STR " INPUT: %8s, MAP: %2u, ID: %3u, Len: %d, Data:", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->input.usage), param->input.map_index, param->input.report_id, param->input.length);
 						   //ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
-                           xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
-			blue_input(param->input.dev, param->input.data, param->input.length);
+						   xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
+			blue_h_input(param->input.dev, param->input.data, param->input.length);
 			break;
 					   }
 		case ESP_HIDH_FEATURE_EVENT: {
-            bda = esp_hidh_dev_bda_get(param->feature.dev);
-						     ESP_LOGI(TAG, ESP_BD_ADDR_STR " FEATURE: %8s, MAP: %2u, ID: %3u, Len: %d", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->feature.usage), param->feature.map_index, param->feature.report_id, param->feature.length);
-						     ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
-						     break;
-					     }
+			bda = esp_hidh_dev_bda_get(param->feature.dev);
+							 ESP_LOGI(TAG, ESP_BD_ADDR_STR " FEATURE: %8s, MAP: %2u, ID: %3u, Len: %d", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->feature.usage), param->feature.map_index, param->feature.report_id, param->feature.length);
+							 ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
+							 break;
+						 }
 		case ESP_HIDH_CLOSE_EVENT: {
-			blue_close(param);
+			blue_h_close(param);
 			break;
 		}
 		default:
@@ -125,7 +92,7 @@ void hidh_callback(void *handler_args, esp_event_base_t base, int32_t id, void *
 	}
 }
 
-void blue_close(esp_hidh_event_data_t *p) {
+void blue_h_close(esp_hidh_event_data_t *p) {
 	const uint8_t *bda = NULL;
 
 	configASSERT(p != NULL);
@@ -176,11 +143,12 @@ void blue_init(void)
 
 	ESP_LOGD(TAG, "Starting Bluetooth init on core %d", xPortGetCoreID());
 	ESP_ERROR_CHECK(ret);
+	/* ESP_BT_MODE_CLASSIC_BT doesn't work, it freezes esp_hidh_init */
 	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_BTDM));
 	ESP_ERROR_CHECK(esp_ble_gattc_register_callback(esp_hidh_gattc_event_handler));
 
 	esp_hidh_config_t config = {
-		.callback = hidh_callback,
+		.callback = blue_h_callback,
 		.event_stack_size = 4096
 	};
 
@@ -214,7 +182,7 @@ void blue_init(void)
  * 3+   | 0-7  | Device specific, usually 3 is scroll wheel, usually unused (0)
  */
 
-void blue_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
+void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 	uint8_t buttons;
 	uint8_t	i;
 	int8_t x, y;
@@ -251,7 +219,7 @@ void blue_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 
 	blue_handle_button(buttons);
 
-	/* quadrature use 7 bits x/y offsets, bluetooth Boot use 8 bits */
+	/* quadrature use 7 bits x/y offsets, bluetooth BOOT uses 8 bits */
 	x = data[1];
 	y = data[2];
 
@@ -269,28 +237,27 @@ void blue_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 	}
 }
 
-void blue_open(esp_hidh_event_data_t *p) {
+void blue_h_open(esp_hidh_event_data_t *p) {
     const uint8_t *bda = NULL;
-
-	esp_hid_report_item_t	mir;	/* MOUSE INPUT REPORT */
 
 	configASSERT(p != NULL);
     bda = esp_hidh_dev_bda_get(p->open.dev);
     ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 
-	/* search for MIR section */
-	esp_hid_raw_report_map_t *maps;
-	maps = blue_hid_rm_get(p->open.dev);
-
+	/* Dump various info on console */
+	blue_hid_rm_get(p->open.dev);
 	blue_set_boot_protocol(p->open.dev);
-	mir = blue_hid_ri_find(p->open.dev, ESP_HID_USAGE_MOUSE, ESP_HID_REPORT_TYPE_INPUT, ESP_HID_PROTOCOL_MODE_REPORT);
+	if (blue_support_boot(p->open.dev) == false) {
+		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+		ESP_LOGE(TAG, "Mouse does not support boot protocol !");
+	}
 
     xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
     gpio_output_enable();
 }
 
 /* get specific report from report map matching specified usage + type + protocol */
-static esp_hid_report_item_t blue_hid_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p) {
+static esp_hid_report_item_t blue_h_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u, uint8_t t, uint8_t p) {
 	size_t num_reports = 0;
 	esp_hid_report_item_t *reports;
 	esp_hid_report_item_t search;
@@ -416,7 +383,6 @@ static void blue_set_boot_protocol(esp_hidh_dev_t *dev) {
 		esp_err_t               (*report_read)  (esp_hidh_dev_t *dev, size_t map_index, size_t report_id, int report_type, size_t max_length, uint8_t *value, size_t *value_len);
 		void                    (*dump)         (esp_hidh_dev_t *dev, FILE *fp);
 
-		uint8_t padding;		// for some reason, bda is off by one byte...
 		esp_bd_addr_t bda;
 
 		struct {
@@ -433,14 +399,20 @@ static void blue_set_boot_protocol(esp_hidh_dev_t *dev) {
 	pass_that_handle = (struct decoy_dev_s *)dev;
 
 	ESP_LOGI(TAG, "switching " ESP_BD_ADDR_STR " (%i) to protocol mode boot" ,
-			 pass_that_handle->bt.handle, ESP_BD_ADDR_HEX(pass_that_handle->bda));
+			 ESP_BD_ADDR_HEX(pass_that_handle->bda), pass_that_handle->bt.handle);
 
-	//ESP_LOG_BUFFER_HEX(TAG, dev, sizeof(struct decoy));
+	//ESP_LOG_BUFFER_HEX(TAG, dev, sizeof(struct decoy_dev_s));
 	/* bluedroid/bta/include/bta_hh_api.h */
 	BTA_HhSetProtoMode(pass_that_handle->bt.handle, 0x01);
 }
 
-static bool blue_support_boot_protocol(esp_hidh_dev_t *dev) {
+static bool blue_support_boot(esp_hidh_dev_t *dev) {
+	esp_hid_report_item_t	mib;
+
 	configASSERT(dev != NULL);
+	mib = blue_h_ri_find(dev, ESP_HID_USAGE_MOUSE, ESP_HID_REPORT_TYPE_INPUT, ESP_HID_PROTOCOL_MODE_BOOT);
+	if (mib.value_len == 0)
+		return false;
+	return true;
 }
 

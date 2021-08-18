@@ -38,9 +38,9 @@
 
 /* prototypes */
 void	blue_init(void);
-void	blue_input(esp_hidh_dev_t *dev, uint8_t  *data, uint16_t length);
-void    blue_close(esp_hidh_event_data_t *p);
-void    blue_open(esp_hidh_event_data_t *p);
+void	blue_h_input(esp_hidh_dev_t *dev, uint8_t  *data, uint16_t length);
+void    blue_h_close(esp_hidh_event_data_t *p);
+void    blue_h_open(esp_hidh_event_data_t *p);
 void    blue_scan(void *pvParameters);
 
 /* global variables for tasks handles */
