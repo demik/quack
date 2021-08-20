@@ -133,8 +133,6 @@ static void blue_d_init() {
 	}
 
 	ESP_ERROR_CHECK(esp_hidd_dev_init(&m4848_config, ESP_HID_TRANSPORT_BLE, blue_d_callback, &hid_dev));
-
-	vTaskDelay(10000 / portTICK_PERIOD_MS);
 	xTaskCreate(blue_adb2hid, "ADB2BT", 2 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_adb2hid);
 }
 
@@ -145,7 +143,7 @@ static void blue_d_init() {
 
 static void blue_d_start()
 {
-	ESP_LOGD(TAG, "Bluetooth Mouse started");
+	ESP_LOGD(TAG, "Bluetooth stack started");
 	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 	esp_hid_ble_gap_adv_start();
 }
@@ -166,6 +164,9 @@ void	blue_adb2hid(void *pvParameters) {
 	while (true) {
 		xTaskNotifyWait(0, 0, &tmp, portMAX_DELAY);
 		data = (uint16_t)tmp;
+
+		if (! esp_hidd_dev_connected(hid_dev))
+			continue;
 
 		/* button pressed */
 		if (! (data & ADB_CMP_B1) || (! (data & ADB_CMP_B2)))
@@ -229,8 +230,7 @@ void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void
 			break;
 		}
 		case ESP_HIDH_INPUT_EVENT: {
-			bda = esp_hidh_dev_bda_get(param->input.dev);
-			ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
+			//ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
 			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 			blue_h_input(param->input.dev, param->input.data, param->input.length);
 			break;
