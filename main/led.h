@@ -23,9 +23,16 @@
 #define LED_H
 
 /* prototypes */
-void	led_dispatch(void *pvParameters);
-void	led_init(void);
-void    led_task(void *pvParameters);
+void		led_dispatch(void *pvParameters);
+const char	*led_gpio_name(uint8_t id);
+void		led_init(void);
+void    	led_task(void *pvParameters);
+
+/* structures */
+typedef struct led_names_s {
+	const uint8_t num;
+	const char *name;
+} led_names_t;
 
 /* defines */
 #define LED_OFF		(1 << 0)

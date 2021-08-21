@@ -23,6 +23,7 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_err.h"
@@ -36,6 +37,8 @@
 /* global variables for tasks handles */
 TaskHandle_t t_click, t_qx, t_qy;
 esp_timer_handle_t quad_qx, quad_qy;
+
+QueueHandle_t q_qx, q_qy;
 
 /* static functions */
 static void	IRAM_ATTR quad_timer(void* arg);
@@ -63,14 +66,17 @@ void	quad_init(void) {
 	gpio_set_level(GPIO_QY2, q2[0]);
 
 	/* create timers for quadrature phases */
-	args.callback = &quad_timer;
+	args.callback = quad_timer;
 	args.arg = t_qx;
 	args.name = "quad_qx";
 	ESP_ERROR_CHECK(esp_timer_create(&args, &quad_qx));
-	args.callback = &quad_timer;
+	args.callback = quad_timer;
 	args.arg = t_qy;
 	args.name = "quad_qy";
 	ESP_ERROR_CHECK(esp_timer_create(&args, &quad_qy));
+
+	q_qx = xQueueCreate(4, sizeof(int8_t));
+	q_qy = xQueueCreate(4, sizeof(int8_t));
 
 	ESP_LOGI("quad", "Quadrature tasks started on core %d", xPortGetCoreID());
 }
@@ -97,16 +103,14 @@ void	quad_click(void *pvParameters) {
 }
 
 void IRAM_ATTR quad_move_x(void *pvParameters) {
-	unsigned int value = 0;
-	int	move = 0;
+	int8_t move = 0;
 	uint8_t i = 0;
 
 	(void)pvParameters;
 
 	while (true) {
-		xTaskNotifyWait(0, 0, &value, portMAX_DELAY);
-		assert(value != 0);
-		move = (signed)value;
+		xQueueReceive(q_qx, &move, portMAX_DELAY);
+		assert(move != 0);
 
 		if (move > 0) {
 			while (move--) {
@@ -114,7 +118,7 @@ void IRAM_ATTR quad_move_x(void *pvParameters) {
 				gpio_set_level(GPIO_QX1, q1[i % 4]);
 				gpio_set_level(GPIO_QX2, q2[i % 4]);
 				ESP_ERROR_CHECK(esp_timer_start_once(quad_qx, QUAD_INTERVAL));
-				vTaskSuspend(NULL);
+				ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 			}
 		}
 		else {
@@ -123,23 +127,21 @@ void IRAM_ATTR quad_move_x(void *pvParameters) {
 				gpio_set_level(GPIO_QX1, q1[i % 4]);
 				gpio_set_level(GPIO_QX2, q2[i % 4]);
 				ESP_ERROR_CHECK(esp_timer_start_once(quad_qx, QUAD_INTERVAL));
-				vTaskSuspend(NULL);
+				ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 			}
 		}
 	}
 }
 
 void IRAM_ATTR quad_move_y(void *pvParameters) {
-	unsigned int value = 0;
-	int	move = 0;
+	int8_t move = 0;
 	uint8_t i = 0;
 
 	(void)pvParameters;
 
 	while (true) {
-		xTaskNotifyWait(0, 0, &value, portMAX_DELAY);
-		assert(value != 0);
-		move = (signed)value;
+		xQueueReceive(q_qy, &move, portMAX_DELAY);
+		assert(move != 0);
 
 		if (move > 0) {
 			while (move--) {
@@ -147,7 +149,7 @@ void IRAM_ATTR quad_move_y(void *pvParameters) {
 				gpio_set_level(GPIO_QY1, q1[i % 4]);
 				gpio_set_level(GPIO_QY2, q2[i % 4]);
 				ESP_ERROR_CHECK(esp_timer_start_once(quad_qy, QUAD_INTERVAL));
-				vTaskSuspend(NULL);
+				ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 			}
 		}
 		else {
@@ -156,18 +158,18 @@ void IRAM_ATTR quad_move_y(void *pvParameters) {
 				gpio_set_level(GPIO_QY1, q1[i % 4]);
 				gpio_set_level(GPIO_QY2, q2[i % 4]);
 				ESP_ERROR_CHECK(esp_timer_start_once(quad_qy, QUAD_INTERVAL));
-				vTaskSuspend(NULL);
+				ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 			}
 		}
 	}
 }
 
-/* simple ISR function. Resume task that called the oneshot timer */
+/* simple ISR function. Resume the task that called the oneshot timer */
 static void IRAM_ATTR quad_timer(void* arg) {
-	BaseType_t xYieldRequired = pdFALSE;
-	xYieldRequired = xTaskResumeFromISR(arg);
+	BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
+	vTaskNotifyGiveFromISR(arg, &pxHigherPriorityTaskWoken);
 
 	/* switch context of needed */
-	if( xYieldRequired == pdTRUE )
+	if( pxHigherPriorityTaskWoken == pdTRUE )
 		portYIELD_FROM_ISR();
 }

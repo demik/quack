@@ -29,7 +29,7 @@ void		quad_move_x(void *pvParameters);
 void		quad_move_y(void *pvParameters);
 
 /* defines */
-#define QUAD_INTERVAL 400
+#define QUAD_INTERVAL 200
 
 #endif
 

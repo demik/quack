@@ -54,10 +54,13 @@ static const char *TAG = "blue";
 
 /* globals */
 TaskHandle_t t_adb2hid;
-extern TaskHandle_t t_click, t_qx, t_qy;
+extern TaskHandle_t t_click;
 static esp_hidd_dev_t *hid_dev = NULL;
+extern QueueHandle_t q_qx, q_qy;
 
 /* private functions */
+static void blue_d_connect(void);
+static void blue_d_disconnect(esp_hidd_event_data_t *dev);
 static void blue_d_init(void);
 static void blue_d_start(void);
 void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data);
@@ -83,8 +86,7 @@ static void blue_d_callback(void *handler_args, esp_event_base_t base, int32_t i
 			break;
 		}
 		case ESP_HIDD_CONNECT_EVENT: {
-			ESP_LOGI(TAG, "CONNECT");
-			xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
+			blue_d_connect();
 			break;
 		}
 		case ESP_HIDD_PROTOCOL_MODE_EVENT: {
@@ -106,9 +108,7 @@ static void blue_d_callback(void *handler_args, esp_event_base_t base, int32_t i
 			break;
 		}
 		case ESP_HIDD_DISCONNECT_EVENT: {
-			ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
-			esp_hid_ble_gap_adv_start();
-			xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+			blue_d_disconnect(param);
 			break;
 		}
 		case ESP_HIDD_STOP_EVENT: {
@@ -119,6 +119,18 @@ static void blue_d_callback(void *handler_args, esp_event_base_t base, int32_t i
 			break;
 	}
 	return;
+}
+
+static void blue_d_connect() {
+	ESP_LOGI(TAG, "Host connected");
+	xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
+}
+
+static void blue_d_disconnect(esp_hidd_event_data_t *dev) {
+	ESP_LOGI(TAG, "Host disconnected, reason: %s",
+			 esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(dev->disconnect.dev), dev->disconnect.reason));
+	esp_hid_ble_gap_adv_start();
+	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 }
 
 static void blue_d_init() {
@@ -393,17 +405,24 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 	x = data[1];
 	y = data[2];
 
+	/* reduce bluetooth movement speed as well before notifying */
 	if (x != 0) {
-		if (x == 1 || x == -1)
-			xTaskNotify(t_qx, x, eSetValueWithOverwrite);
-		else
-			xTaskNotify(t_qx, x / 2, eSetValueWithOverwrite);
+		if (x == 1 || x == -1) {
+			xQueueSendToBack(q_qx, &x, 0);
+		}
+		else {
+			x /= 2;
+			xQueueSendToBack(q_qx, &x, 0);
+		}
 	}
 	if (y != 0) {
-		if (y == 1 || y == -1)
-			xTaskNotify(t_qy, y, eSetValueWithOverwrite);
-		else
-			xTaskNotify(t_qy, y / 2, eSetValueWithOverwrite);
+		if (y == 1 || y == -1) {
+			xQueueSendToBack(q_qy, &y, 0);
+		}
+		else {
+			y /= 2;
+			xQueueSendToBack(q_qy, &y, 0);
+		}
 	}
 }
 

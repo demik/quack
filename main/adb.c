@@ -23,6 +23,7 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_system.h"
@@ -43,7 +44,8 @@
 rmt_config_t adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
 extern TaskHandle_t t_adb2hid;
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
-extern TaskHandle_t t_click, t_qx, t_qy;
+extern TaskHandle_t t_click;
+extern QueueHandle_t q_qx, q_qy;
 
 /* static defines */
 static void	adb_handle_button(bool action);
@@ -234,7 +236,7 @@ void	adb_task_host(void *pvParameters) {
 			}
 
 			if (move)
-				xTaskNotify(t_qx, move, eSetValueWithOverwrite);
+				xQueueSendToBack(q_qx, &move, 0);
 
 			move = (data & ADB_CMP_MY) >> 8;
 			if (move & 0x40) {
@@ -244,7 +246,7 @@ void	adb_task_host(void *pvParameters) {
 			}
 
 			if (move)
-				xTaskNotify(t_qy, move, eSetValueWithOverwrite);
+				xQueueSendToBack(q_qy, &move, 0);
 		}
 		else {
 			last++;
