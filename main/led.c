@@ -36,7 +36,7 @@
 #define TAG "LED"
 
 /* global variables for tasks handles */
-TaskHandle_t    t_irq, t_green, t_blue, t_yellow, t_red;
+TaskHandle_t    t_dispatch, t_green, t_blue, t_yellow, t_red;
 
 static ledc_timer_config_t ledc_timer = {
 	.duty_resolution = LEDC_TIMER_12_BIT,	// resolution of PWM duty
@@ -129,16 +129,38 @@ void	led_dispatch(void *pvParameters)
 	/* avoit cur duty + target spam on console */
 	esp_log_level_set("ledc", ESP_LOG_INFO);
 
-	xTaskCreatePinnedToCore(led_task, "GREEN", 2 * 1024, (void *) GPIO_GREENLED, tskIDLE_PRIORITY, &t_green, 1);
-	xTaskCreatePinnedToCore(led_task, "BLUE", 2 * 1024, (void *) GPIO_BLUELED, tskIDLE_PRIORITY, &t_blue, 1);
-	xTaskCreatePinnedToCore(led_task, "YELLOW", 2 * 1024, (void *) GPIO_YELLOWLED, tskIDLE_PRIORITY, &t_yellow, 1);
-	xTaskCreatePinnedToCore(led_task, "RED", 2 * 1024, (void *) GPIO_REDLED, tskIDLE_PRIORITY, &t_red, 1);
+	xTaskCreate(led_task, led_gpio_name(GPIO_GREENLED), 2 * 1024, (void *) GPIO_GREENLED, tskIDLE_PRIORITY, &t_green);
+	xTaskCreate(led_task, led_gpio_name(GPIO_BLUELED), 2 * 1024, (void *) GPIO_BLUELED, tskIDLE_PRIORITY, &t_blue);
+	xTaskCreate(led_task, led_gpio_name(GPIO_YELLOWLED), 2 * 1024, (void *) GPIO_YELLOWLED, tskIDLE_PRIORITY, &t_yellow);
+	xTaskCreate(led_task, led_gpio_name(GPIO_REDLED), 2 * 1024, (void *) GPIO_REDLED, tskIDLE_PRIORITY, &t_red);
 
 	/* blink green led fast (we are booting...) */
 	xTaskNotify(t_green, LED_FAST, eSetValueWithOverwrite);
 
-	ESP_LOGI(TAG, "led_dispatch suspending itself on core %d", xPortGetCoreID());
-	vTaskSuspend(NULL);
+	ESP_LOGI(TAG, "tasks dispatch finished on core %d", xPortGetCoreID());
+	vTaskDelete(t_dispatch);
+}
+
+const char	*led_gpio_name(uint8_t id) {
+	uint8_t i = 0;
+
+	static const led_names_t led_names[] = {
+		{ .num = GPIO_GREENLED, .name = "GREEN" },
+		{ .num = GPIO_BLUELED, .name = "BLUE" },
+		{ .num = GPIO_YELLOWLED, .name = "YELLOW" },
+		{ .num = GPIO_REDLED, .name = "RED" },
+		{ .num = 0, .name = NULL}
+	};
+
+	configASSERT(id < 28);
+
+	while (led_names[i].name != NULL) {
+		if (led_names[i].num == id)
+			return led_names[i].name;
+		i++;
+	}
+
+	return "NA";
 }
 
 void	led_init(void) {
@@ -158,7 +180,7 @@ void	led_init(void) {
 	ledc_channel_config(&ledc_channel[GPIO_BLUELED - 20]);
 	ledc_channel_config(&ledc_channel[GPIO_YELLOWLED - 20]);
 	ledc_channel_config(&ledc_channel[GPIO_REDLED - 20]);
-	xTaskCreatePinnedToCore(led_dispatch, "DISPATCH", 2 * 1024, NULL, tskIDLE_PRIORITY, &t_irq, 1);
+	xTaskCreatePinnedToCore(led_dispatch, "DISPATCH", 2 * 1024, NULL, tskIDLE_PRIORITY, &t_dispatch, 1);
 }
 
 void	led_task(void *pvParameters) {
@@ -169,7 +191,7 @@ void	led_task(void *pvParameters) {
 	/* start only if there is a led specified */
 	configASSERT(((uint32_t) pvParameters) > 0);
 
-	ESP_LOGI(TAG, "led task %i started on core %d", color, xPortGetCoreID());
+	ESP_LOGI(TAG, "led task %s started on core %d", led_gpio_name(color), xPortGetCoreID());
 
 	while (1) {
 		xTaskNotifyWait(0, 0, &mode, wait);
