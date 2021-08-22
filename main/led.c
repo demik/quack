@@ -129,10 +129,10 @@ void	led_dispatch(void *pvParameters)
 	/* avoit cur duty + target spam on console */
 	esp_log_level_set("ledc", ESP_LOG_INFO);
 
-	xTaskCreate(led_task, led_gpio_name(GPIO_GREENLED), 2 * 1024, (void *) GPIO_GREENLED, tskIDLE_PRIORITY, &t_green);
-	xTaskCreate(led_task, led_gpio_name(GPIO_BLUELED), 2 * 1024, (void *) GPIO_BLUELED, tskIDLE_PRIORITY, &t_blue);
-	xTaskCreate(led_task, led_gpio_name(GPIO_YELLOWLED), 2 * 1024, (void *) GPIO_YELLOWLED, tskIDLE_PRIORITY, &t_yellow);
-	xTaskCreate(led_task, led_gpio_name(GPIO_REDLED), 2 * 1024, (void *) GPIO_REDLED, tskIDLE_PRIORITY, &t_red);
+	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_GREENLED), 2 * 1024, (void *) GPIO_GREENLED, tskIDLE_PRIORITY, &t_green, 1);
+	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_BLUELED), 2 * 1024, (void *) GPIO_BLUELED, tskIDLE_PRIORITY, &t_blue, 1);
+	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_YELLOWLED), 2 * 1024, (void *) GPIO_YELLOWLED, tskIDLE_PRIORITY, &t_yellow, 1);
+	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_REDLED), 2 * 1024, (void *) GPIO_REDLED, tskIDLE_PRIORITY, &t_red, 1);
 
 	/* blink green led fast (we are booting...) */
 	xTaskNotify(t_green, LED_FAST, eSetValueWithOverwrite);

@@ -105,7 +105,7 @@ void	adb_init(void) {
 	if (adb_is_host())
 		xTaskCreatePinnedToCore(adb_task_host, "ADB_HOST", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 	else
-		xTaskCreatePinnedToCore(adb_task_idle, "ADB_MOUSE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
+		xTaskCreatePinnedToCore(adb_task_idle, "ADB_IDLE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 }
 
 inline bool	adb_is_host(void) {
@@ -267,15 +267,16 @@ void	adb_task_host(void *pvParameters) {
 
 /*
  * this do nothing since device mode doesn't work
- * put GPIO and Level converter on output mode and set everything low
+ * put level converter on input mode with a pull up to avoid oscillations
+ * if plugged into an ADB Bus by mistake.
  */
 
 void	adb_task_idle(void *pvParameters) {
 	ESP_LOGI(TAG, "idle started on core %d", xPortGetCoreID());
 
 	/* RMT is not installed via rmt_driver_install() so no need to uninstall */
-	adb_tx_setup();
-	gpio_set_level(GPIO_ADB, 0);
+	adb_rx_setup();
+	ESP_ERROR_CHECK(gpio_pullup_en(GPIO_ADB));
 
 	/*
 	 * We sould exit here but for some reason core 1 panic with
