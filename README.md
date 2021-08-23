@@ -1,23 +1,16 @@
-# Hello World Example
+# Quack Mouse Converter
 
-Starts a FreeRTOS task to print "Hello World"
+The Quack Mouse project is a Bluetooth & ADB Mouse "Dongle" for the Macintosh 128/512/Plus. It allow you to use most ADB and BT4+ mouses with a Macintosh 128/512/Plus though the mouse port of the Macintosh.
 
-See the README.md file in the upper level 'examples' directory for more information about examples.
+It include a custom PCB (EDA subfolder) with the accompanying firmware (code in main subfolder)
 
-### LED Error codes
+### Supported mouse conversions:
 
-| Color | Status | Description             |
-|-------|--------|-------------------------|
-| Green | On     | Quack is running        |
-| Green | Off    | No power                |
-| Green | Fast   | Quack is starting up    |
-| Green | Slow   | Mouse battery low       |
-| Blue  | Off    | Bluetooth disabled      |
-| Blue  | On     | Bluetooth connected     |
-| Blue  | Fast   | Bluetooth starting up   |
-| Blue  | Slow   | Bluetooth not connected |
-| Amber | Pulse  | Mouse activity          |
-| Amber | Slow   | ADB mouse not detected  |
-| Red   | Off    | No errors detected      |
-| Red   | On     | Configuration error     |
-| Red   | Pulse  | Invalid mouse data*     |
+Quack support the following mouses:
+- ADB mouse to Macintosh 128/512/Plus
+- Bluetooth 4.0+ mouse to Macintosh 128/512/Plus
+
+### Unsupported mouse conversions:
+
+- ADB mouse to Bluetooth LE host
+This is a work in project for now, it doesn't work with all mainstream operating systems.
