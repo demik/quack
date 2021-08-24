@@ -14,3 +14,7 @@ Quack support the following mouses:
 
 - ADB mouse to Bluetooth LE host
 This is a work in project for now, it doesn't work with all mainstream operating systems.
+
+### Documentation
+
+More documentation is avaible on the Wiki. Please check it out: https://github.com/demik/quack/wiki
