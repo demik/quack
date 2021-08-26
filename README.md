@@ -6,14 +6,14 @@ It include a custom PCB (EDA subfolder) with the accompanying firmware (code in 
 
 ### Supported mouse conversions:
 
-Quack support the following mouses:
+Quack support the following conversions:
 - ADB mouse to Macintosh 128/512/Plus
-- Bluetooth 4.0+ mouse to Macintosh 128/512/Plus
+- Bluetooth mouse to Macintosh 128/512/Plus
 
 ### Unsupported mouse conversions:
 
 - ADB mouse to Bluetooth LE host
-This is a work in project for now, it doesn't work with all mainstream operating systems.
+This is a work in progress for now, it doesn't work with all mainstream operating systems.
 
 ### Documentation
 
