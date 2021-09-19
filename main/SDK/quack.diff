@@ -1,5 +1,5 @@
 diff --git a/components/bt/host/bluedroid/bta/hh/bta_hh_le.c b/components/bt/host/bluedroid/bta/hh/bta_hh_le.c
-index 6c86cb9be..8fdf1a1dc 100644
+index 6c86cb9be7..8fdf1a1dc3 100644
 --- a/components/bt/host/bluedroid/bta/hh/bta_hh_le.c
 +++ b/components/bt/host/bluedroid/bta/hh/bta_hh_le.c
 @@ -498,7 +498,7 @@ tBTA_HH_LE_RPT *bta_hh_le_find_rpt_by_idtype(tBTA_HH_LE_RPT *p_head, UINT8 mode,
@@ -12,7 +12,7 @@ index 6c86cb9be..8fdf1a1dc 100644
  
      for (i = 0 ; i < BTA_HH_LE_RPT_MAX; i ++, p_rpt++) {
 diff --git a/components/esp_hid/include/esp_hidh.h b/components/esp_hid/include/esp_hidh.h
-index b1a826430..bedcb42b6 100644
+index b1a8264307..bedcb42b65 100644
 --- a/components/esp_hid/include/esp_hidh.h
 +++ b/components/esp_hid/include/esp_hidh.h
 @@ -100,6 +100,7 @@ typedef union {
@@ -24,7 +24,7 @@ index b1a826430..bedcb42b6 100644
  
  /**
 diff --git a/components/esp_hid/src/ble_hidh.c b/components/esp_hid/src/ble_hidh.c
-index 5fe54f2fa..28cc35e29 100644
+index 5fe54f2fa7..28cc35e295 100644
 --- a/components/esp_hid/src/ble_hidh.c
 +++ b/components/esp_hid/src/ble_hidh.c
 @@ -617,7 +617,7 @@ esp_err_t esp_ble_hidh_init(const esp_hidh_config_t *config)
@@ -37,7 +37,7 @@ index 5fe54f2fa..28cc35e29 100644
      };
      ret = esp_event_loop_create(&event_task_args, &event_loop_handle);
 diff --git a/components/esp_hid/src/bt_hidh.c b/components/esp_hid/src/bt_hidh.c
-index 1a17e6aa3..6ae12958f 100644
+index 1a17e6aa35..6ae12958ff 100644
 --- a/components/esp_hid/src/bt_hidh.c
 +++ b/components/esp_hid/src/bt_hidh.c
 @@ -320,7 +320,7 @@ esp_err_t esp_bt_hidh_init(const esp_hidh_config_t *config)
