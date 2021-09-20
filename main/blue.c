@@ -57,6 +57,7 @@ TaskHandle_t t_adb2hid;
 extern TaskHandle_t t_click;
 static esp_hidd_dev_t *hid_dev = NULL;
 extern QueueHandle_t q_qx, q_qy;
+uint8_t	blue_pointers;	// mouse count
 
 /* private functions */
 static void blue_d_connect(void);
@@ -270,7 +271,9 @@ void blue_h_close(esp_hidh_event_data_t *p) {
 	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 	esp_hidh_dev_free(p->close.dev);
 
-	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+	blue_pointers--;
+	if (! blue_pointers)
+		xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 }
 
 static void	blue_handle_button(uint8_t buttons) {
@@ -309,6 +312,7 @@ static void blue_h_init(void) {
 
 	ESP_ERROR_CHECK(esp_hidh_init(&config));
 
+	blue_pointers = 0;
 	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
 }
 
@@ -441,6 +445,7 @@ void blue_h_open(esp_hidh_event_data_t *p) {
 		ESP_LOGE(TAG, "Mouse does not support boot protocol !");
 	}
 
+	blue_pointers++;
     xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
     gpio_output_enable();
 }

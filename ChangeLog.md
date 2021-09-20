@@ -2,6 +2,7 @@
 - update to ESP-IDF v4.2.2:
 	- https://github.com/espressif/esp-idf/releases/tag/v4.2.2
 	- fixed controller not reporting disconnect event
+- fixed BT LED state when using multiple mouses
 
 ## v1.4.0
 - Initial firmare release
