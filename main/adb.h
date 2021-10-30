@@ -66,8 +66,10 @@ void	adb_tx_reset(void);
 #define ADB_B_DOWN	1
 
 #define ADB_H_ALL	0xff	// Handlers bitmask
+#define ADB_H_ERR	0x00	// Handler 0 (Self init error)
 #define ADB_H_C100	0x01	// Handler 1 (Classic @ 100cpi)
 #define ADB_H_C200	0x02	// Handler 2 (Classic @ 200cpi)
+#define ADB_H_MTRC	0x2f	// Handler for MacTRAC 2.0
 #define ADB_H_MOVE	0xfe	// Move to another address
 
 /* Host states */

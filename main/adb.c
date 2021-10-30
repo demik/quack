@@ -139,7 +139,12 @@ void adb_probe(void) {
 		register3 = adb_rx_mouse();
 		ESP_LOGD("ADB", "Device $3 register3: %x", register3);
 
-		if ((register3 & ADB_H_ALL) == ADB_H_C100) {
+		if (register3 && (register3 & ADB_H_ALL) == ADB_H_ERR)
+			ESP_LOGE(TAG, "Mouse failed self init test");
+
+		/* Accept all known handlers */
+		if (((register3 & ADB_H_ALL) == ADB_H_C100) || ((register3 & ADB_H_ALL) == ADB_H_C200) ||
+			((register3 & ADB_H_ALL) == ADB_H_MTRC)) {
 			ESP_LOGI(TAG, "... detected mouse at $3");
 			break;
 		}
@@ -162,6 +167,9 @@ void adb_probe(void) {
 			break;
 		case ADB_H_C200:
 			ESP_LOGD(TAG, "Mouse running at 200cpi");
+			break;
+		case ADB_H_MTRC:
+			ESP_LOGD(TAG, "MacTRAC running at default cpi");
 			break;
 		default:
 			ESP_LOGE(TAG, "Mouse running with unknow handler: %x", register3 & ADB_H_ALL);

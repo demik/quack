@@ -1,3 +1,6 @@
+## v1.4.2 (unreleased)
+- added support for MicroSpeed MacTRAC 2.0
+
 ## v1.4.1
 - update to ESP-IDF v4.2.2:
 	- https://github.com/espressif/esp-idf/releases/tag/v4.2.2
