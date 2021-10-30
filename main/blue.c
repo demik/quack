@@ -513,7 +513,10 @@ void blue_scan(void *pvParameters) {
     ESP_LOGI(TAG, "starting scan on core %d…", xPortGetCoreID());
     esp_hid_scan(BLUE_SCAN_DURATION, &len, &results);
     ESP_LOGI(TAG, "scan returned %u result(s)", len);
-	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+
+	/* don't put the slow blink is a device reconnected while scanning */
+	if (blue_pointers == 0)
+		xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 
     if (len) {
         esp_hid_scan_result_t *r = results;

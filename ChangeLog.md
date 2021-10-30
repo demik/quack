@@ -1,5 +1,6 @@
-## v1.4.2 (unreleased)
+## v1.4.2
 - added support for MicroSpeed MacTRAC 2.0
+- fixed a BT led state when a device reconnect while scanning
 
 ## v1.4.1
 - update to ESP-IDF v4.2.2:
