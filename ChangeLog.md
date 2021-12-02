@@ -1,3 +1,6 @@
+## v1.4.3
+- provides some slight acceleration and desceleration on bluetooth mouses
+
 ## v1.4.2
 - added support for MicroSpeed MacTRAC 2.0
 - fixed a BT led state when a device reconnect while scanning

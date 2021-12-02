@@ -376,6 +376,19 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 	buttons = data[0];
 
 	/*
+	 * A friend of mine did this for a beer, it helps a little with high DPI mouses
+	 * This is a precalculated table that looks like a squadhed arctan()
+	 */
+
+	const unsigned char hid2quad[] = {
+		0x01, 0x01, 0x02, 0x02, 0x03, 0x04, 0x05, 0x06,
+		0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0E, 0x0F,
+		0x11, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19,
+		0x1A, 0x1C, 0x1D, 0x1E, 0x20, 0x21, 0x22, 0x23,
+		0x24, 0x25, 0x26, 0x26, 0x27, 0x27, 0x28, 0x28
+	};
+
+	/*
 	 * Do some checks before parsing data. We sould't get anything wrong in theory,
 	 * but we sometimes to get shit from either mouse or bluetooth stack
 	 *
@@ -405,28 +418,44 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 
 	blue_handle_button(buttons);
 
-	/* quadrature use 7 bits x/y offsets, bluetooth BOOT uses 8 bits */
+	/*
+	 * this try to help avoiding issues with high DPI mouses:
+	 * - reduce bluetooth movement speed a little bit before 40 pixels per poll
+	 * - go slower after 40 pixels per poll just to avoid too big jumps
+	 */
+
 	x = data[1];
 	y = data[2];
 
-	/* reduce bluetooth movement speed as well before notifying */
 	if (x != 0) {
-		if (x == 1 || x == -1) {
-			xQueueSendToBack(q_qx, &x, 0);
+		if (x < 0) {
+			if (x < -40)
+				x = ((x + 40) / 2) - 40;
+			else
+				x = -1 * hid2quad[(x * -1) - 1];
 		}
 		else {
-			x /= 2;
-			xQueueSendToBack(q_qx, &x, 0);
+			if (x > 40)
+				x = ((x - 40) / 2) + 40;
+			else
+				x = hid2quad[x - 1];
 		}
+		xQueueSendToBack(q_qx, &x, 0);
 	}
 	if (y != 0) {
-		if (y == 1 || y == -1) {
-			xQueueSendToBack(q_qy, &y, 0);
+		if (y < 0) {
+			if (y < -40)
+				y = ((y + 40) / 2) - 40;
+			else
+				y = -1 * hid2quad[(y * -1) - 1];
 		}
 		else {
-			y /= 2;
-			xQueueSendToBack(q_qy, &y, 0);
+			if (y > 40)
+				y = ((y - 40) / 2) + 40;
+			else
+				y = hid2quad[y - 1];
 		}
+		xQueueSendToBack(q_qy, &y, 0);
 	}
 }
 

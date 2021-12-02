@@ -8,7 +8,7 @@ It include a custom PCB (EDA subfolder) with the accompanying firmware (code in 
 ### Supported mouse conversions:
 
 Quack support the following conversions:
-- ADB mouse to Macintosh 128/512/Plus
+- ADB mouse to Macintosh 128/512/Plus or Apple Lisa
 - Bluetooth mouse to Macintosh 128/512/Plus or Apple Lisa
 
 ### Unsupported mouse conversions:
