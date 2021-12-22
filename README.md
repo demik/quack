@@ -1,6 +1,6 @@
 # Quack Mouse Converter
 
-The Quack Mouse project is a Bluetooth & ADB Mouse "Dongle" for the Macintosh 128/512/Plus and the Apple Lisa. It allow you to use most ADB and BT2+ mouses with a Macintosh 128/512/Plus and Apple Lisa though the mouse port of the Macintosh.
+The Quack Mouse project is a Bluetooth & ADB Mouse "Dongle" for the Macintosh 128/512/Plus and the Apple Lisa. It allow you to use most ADB and BT2+ mouses with a Macintosh 128/512/Plus and Apple Lisa through the quadrature mouse port.
 
 It include a custom PCB (EDA subfolder) with the accompanying firmware (code in main subfolder)
 ![Board](https://raw.githubusercontent.com/demik/quack/master/Images/board.png)
