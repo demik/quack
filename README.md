@@ -1,21 +1,36 @@
+[Board]: Images/Preview.png
+
+[Wiki]: https://github.com/demik/quack/wiki
+[PCB]: EDA/Changelog.md
+[Firmware]: main/README.md
+
+
 # Quack Mouse Converter
 
-The Quack Mouse project is a Bluetooth & ADB Mouse "Dongle" for the Macintosh 128/512/Plus and the Apple Lisa. It allow you to use most ADB and BT2+ mouses with a Macintosh 128/512/Plus and Apple Lisa through the quadrature mouse port.
+This dongle allows various retro systems to use `Apple Desktop Bus` as <br>
+well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
-It include a custom PCB (EDA subfolder) with the accompanying firmware (code in main subfolder)
-![Board](https://raw.githubusercontent.com/demik/quack/master/Images/board.png)
+![Board]
 
-### Supported mouse conversions:
+---
 
-Quack support the following conversions:
-- ADB mouse to Macintosh 128/512/Plus or Apple Lisa
-- Bluetooth mouse to Macintosh 128/512/Plus or Apple Lisa
+**⸢ [Wiki] ⸥ ⸢ [PCB] ⸥ ⸢ [Firmware] ⸥**
 
-### Unsupported mouse conversions:
+---
 
-- ADB mouse to Bluetooth LE host
-This is a work in progress for now, it doesn't work with all mainstream operating systems (Windows 10 works)
+## Supported Configurations
 
-### Documentation
+<table>
+    <tr><th colspan = '2' align = 'center' >Systems</th></tr>
+    <tr><td><code>Macintosh</code><td align = 'center'><code>128</code><br><code>512</code><br><code>Plus</code></td></tr>
+    <tr><td colspan = '2' align = 'center' ><code>Apple Lisa</code></td></tr>
+</table>
 
-More documentation is avaible on the Wiki. Please check it out: https://github.com/demik/quack/wiki
+| Connection Types |
+|:----------:|
+| `Apple Desktop Bus` |
+| `Bluetooth 2+` |
+
+## Unsupported Configurations
+
+- `ADB` ➞ `Bluetooth LE` for **Non-Windows 10**
