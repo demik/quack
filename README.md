@@ -3,6 +3,7 @@
 [Wiki]: https://github.com/demik/quack/wiki
 [PCB]: EDA/Changelog.md
 [Firmware]: main/README.md
+[Changelog]: Changelog.md
 
 
 # Quack Mouse Converter
@@ -14,7 +15,7 @@ well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 ---
 
-**⸢ [Wiki] ⸥ ⸢ [PCB] ⸥ ⸢ [Firmware] ⸥**
+**⸢ [Wiki] ⸥ ⸢ [PCB] ⸥ ⸢ [Firmware] ⸥ ⸢ [Changelog] ⸥**
 
 ---
 
