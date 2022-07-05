@@ -27,23 +27,17 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 <br>
 <br>
 
-## Configurations
+## Supported
+
+#### Systems
+
+<kbd>  Macintosh 128 / 512 / Plus  </kbd>  <kbd>  Apple Lisa  </kbd>
+
+#### Connection Types
+
+<kbd>  Apple Desktop Bus  </kbd>  <kbd>  Bluetooth 2+  </kbd>
 
 <br>
-
-### Supported
-
-<table>
-    <tr><th colspan = 2 align = center>Systems</th></tr>
-    <tr><td><code>Macintosh</code><td align = center><code>128</code><br><code>512</code><br><code>Plus</code></td></tr>
-    <tr><td colspan = 2 align = center ><code>Apple Lisa</code></td></tr>
-</table>
-
-| Connection Types    
-|:-----------------:
-| `Apple Desktop Bus`
-| `Bluetooth 2+`
-
 <br>
 
 ### Unsupported
