@@ -1,8 +1,8 @@
 
 # Quack Mouse Converter   [![Badge License]][License]
 
-This dongle allows various retro systems to use `Apple Desktop Bus` as <br>
-well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
+A dongle that allows various retro systems to use the `Apple Desktop Bus` <br>
+as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 <br>
 
@@ -17,6 +17,7 @@ well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 ---
 
+<br>
 <br>
 
 ![Board]
@@ -45,7 +46,7 @@ well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 <br>
 
-## Unsupported
+### Unsupported
 
 - `ADB`  ➞  `Bluetooth LE` for **Non-Windows 10**
 
@@ -56,11 +57,11 @@ well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 [Documentation]: https://github.com/demik/quack/wiki
 
-[Changelog]: Changelog.md
+[Changelog]: ChangeLog.md
 [Firmware]: main/README.md
 [License]: LICENSE
 [Board]: Resources/Preview.png
-[PCB]: EDA/Changelog.md
+[PCB]: EDA/ChangeLog.md
 
 
 <!-------------------------------[ Badges ]----------------------------------->
