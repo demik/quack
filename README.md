@@ -20,7 +20,10 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 <br>
 <br>
 
-![Board]
+<img
+    src = 'Resources/Preview.png'
+    width = 500
+/>
 
 </div>
 
@@ -54,7 +57,6 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 [Changelog]: ChangeLog.md
 [Firmware]: main/README.md
 [License]: LICENSE
-[Board]: Resources/Preview.png
 [PCB]: EDA/ChangeLog.md
 
 
