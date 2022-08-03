@@ -5,17 +5,15 @@ A dongle that allows various retro systems to use the `Apple Desktop Bus` <br>
 as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 <br>
+<br>
+<br>
 
 <div align = center>
-
----
 
 [![Button Documentation]][Documentation]   
 [![Button Firmware]][Firmware]   
 [![Button PCB]][PCB]   
 [![Button Changelog]][Changelog]
-
----
 
 <br>
 <br>
@@ -62,7 +60,7 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 <!-------------------------------[ Badges ]----------------------------------->
 
-[Badge License]: https://img.shields.io/badge/License-Apache_2.0-D22128?style=for-the-badge
+[Badge License]: https://img.shields.io/badge/License-Apache_2.0-961b1f?style=for-the-badge&labelColor=D22128
 
 
 <!-------------------------------[ Buttons ]----------------------------------->
