@@ -1,21 +1,71 @@
-# Quack Mouse Converter
 
-The Quack Mouse project is a Bluetooth & ADB Mouse "Dongle" for the Macintosh 128/512/Plus and the Apple Lisa. It allow you to use most ADB and BT2+ mouses with a Macintosh 128/512/Plus and Apple Lisa through the quadrature mouse port.
+# Quack Mouse Converter   [![Badge License]][License]
 
-It include a custom PCB (EDA subfolder) with the accompanying firmware (code in main subfolder)
-![Board](https://raw.githubusercontent.com/demik/quack/master/Images/board.png)
+A dongle that allows various retro systems to use the `Apple Desktop Bus` <br>
+as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
-### Supported mouse conversions:
+<br>
+<br>
+<br>
 
-Quack support the following conversions:
-- ADB mouse to Macintosh 128/512/Plus or Apple Lisa
-- Bluetooth mouse to Macintosh 128/512/Plus or Apple Lisa
+<div align = center>
 
-### Unsupported mouse conversions:
+[![Button Documentation]][Documentation]   
+[![Button Firmware]][Firmware]   
+[![Button PCB]][PCB]   
+[![Button Changelog]][Changelog]
 
-- ADB mouse to Bluetooth LE host
-This is a work in progress for now, it doesn't work with all mainstream operating systems (Windows 10 works)
+<br>
+<br>
 
-### Documentation
+<img
+    src = 'Resources/Preview.png'
+    width = 500
+/>
 
-More documentation is avaible on the Wiki. Please check it out: https://github.com/demik/quack/wiki
+</div>
+
+<br>
+<br>
+
+## Supported
+
+#### Systems
+
+<kbd>  Macintosh 128 / 512 / Plus  </kbd>  <kbd>  Apple Lisa  </kbd>
+
+#### Connection Types
+
+<kbd>  Apple Desktop Bus  </kbd>  <kbd>  Bluetooth 2+  </kbd>
+
+<br>
+<br>
+
+### Unsupported
+
+- `ADB`  ➞  `Bluetooth LE` for **Non-Windows 10**
+
+<br>
+
+
+<!----------------------------------------------------------------------------->
+
+[Documentation]: https://github.com/demik/quack/wiki
+
+[Changelog]: ChangeLog.md
+[Firmware]: main/README.md
+[License]: LICENSE
+[PCB]: EDA/ChangeLog.md
+
+
+<!-------------------------------[ Badges ]----------------------------------->
+
+[Badge License]: https://img.shields.io/badge/License-Apache_2.0-961b1f?style=for-the-badge&labelColor=D22128
+
+
+<!-------------------------------[ Buttons ]----------------------------------->
+
+[Button Documentation]: https://img.shields.io/badge/Documentation-0099E5?style=for-the-badge&logoColor=white&logo=BookStack
+[Button Changelog]: https://img.shields.io/badge/Changelog-21375A?style=for-the-badge&logoColor=white&logo=AzureArtifacts
+[Button Firmware]: https://img.shields.io/badge/Firmware-E5426E?style=for-the-badge&logoColor=white&logo=ROS
+[Button PCB]: https://img.shields.io/badge/PCB-007c40?style=for-the-badge&logoColor=white&logo=PowerApps
