@@ -1,3 +1,9 @@
+## v1.4.5
+- update to ESP-IDF v5.1.2
+	- big background update, lot of cleaning and rewrites
+	- as most patches as now mainstream, sdk patching now minimal
+	- removed direct call bluedroid
+
 ## v1.4.4
 - update to ESP-IDF v4.2.3:
 	- https://github.com/espressif/esp-idf/releases/tag/v4.2.2
