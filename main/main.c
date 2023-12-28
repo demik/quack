@@ -24,10 +24,11 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_flash.h"
 #include "esp_hidh.h"
 #include "esp_log.h"
 #include "esp_system.h"
-#include "esp_spi_flash.h"
+#include "esp_chip_info.h"
 
 #include "adb.h"
 #include "blue.h"
@@ -40,20 +41,22 @@ static const char* TAG = "quack";
 
 void app_main(void)
 {
+	uint32_t flash_size;
+	esp_flash_get_size(NULL, &flash_size);
+
 	/* Print chip information */
 	esp_chip_info_t chip_info;
 	esp_chip_info(&chip_info);
 	ESP_LOGI(TAG, "This is %s chip with %d CPU cores, WiFi%s%s, "
-			"revision %d, %dMB %s flash",
+			"revision %d, %" PRIu32 "MB %s flash",
 			CONFIG_IDF_TARGET,
 			chip_info.cores,
 			(chip_info.features & CHIP_FEATURE_BT) ? "/BT" : "",
 			(chip_info.features & CHIP_FEATURE_BLE) ? "/BLE" : "",
-			chip_info.revision,
-			spi_flash_get_chip_size() / (1024 * 1024),
+			chip_info.revision, flash_size / (1024 * 1024),
 			(chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-	ESP_LOGI(TAG, "Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
+	ESP_LOGI(TAG, "Minimum free heap size: %" PRIu32 " bytes", esp_get_minimum_free_heap_size());
 	ESP_LOGI(TAG, "");
 	ESP_LOGI(TAG, "\\_o< \\_o< \\_o< \\_O<");
 	ESP_LOGI(TAG, "");

@@ -27,7 +27,6 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_system.h"
-#include "esp_spi_flash.h"
 
 #include "led.h"
 #include "gpio.h"
@@ -164,7 +163,7 @@ const char	*led_gpio_name(uint8_t id) {
 }
 
 void	led_init(void) {
-	/* blink allds LEDs once */
+	/* blink alls LEDs once */
 	gpio_set_level(GPIO_GREENLED, 1);
 	gpio_set_level(GPIO_BLUELED, 1);
 	gpio_set_level(GPIO_YELLOWLED, 1);
@@ -185,7 +184,7 @@ void	led_init(void) {
 
 void	led_task(void *pvParameters) {
 	unsigned int color = (unsigned int)pvParameters;
-	unsigned int mode = LED_OFF;
+	long unsigned int mode = LED_OFF;
 	TickType_t wait = portMAX_DELAY;
 
 	/* start only if there is a led specified */

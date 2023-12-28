@@ -24,12 +24,13 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "esp_log.h"
 #include "esp_system.h"
-#include "esp_spi_flash.h"
+#include "esp_chip_info.h"
+#include "esp_private/periph_ctrl.h"
 #include "driver/rmt.h"
-#include "driver/periph_ctrl.h"
 #include "soc/periph_defs.h"
 #include "soc/rmt_reg.h"
 
@@ -402,9 +403,9 @@ static inline void	adb_rx_setup() {
 static inline void	adb_tx_as() {
 	/* send attention (800 µs low) + sync (70 µs high) */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(800-1);
+	esp_rom_delay_us(800-1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(70-1);
+	esp_rom_delay_us(70-1);
 }
 
 void IRAM_ATTR adb_tx_cmd(unsigned char cmd) {
@@ -458,16 +459,16 @@ void	adb_tx_listen(unsigned char cmd, uint16_t data) {
 	adb_tx_cmd(cmd);
 
 	/* Stop to start is between 160-240µS. Go for around 160 + time for GPIO setup */
-	ets_delay_us(160);
+	esp_rom_delay_us(160);
 	adb_tx_data(data);
 }
 
 static inline void	adb_tx_one() {
-	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
+	/* values from AN591 Datasheet minus the estimated call to esp_rom_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(ADB_1_LOW - 1);
+	esp_rom_delay_us(ADB_1_LOW - 1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(ADB_1_HIGH - 1);
+	esp_rom_delay_us(ADB_1_HIGH - 1);
 }
 
 void	adb_tx_reset() {
@@ -478,9 +479,9 @@ void	adb_tx_reset() {
 	 */
 
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(ADB_RESET);
+	esp_rom_delay_us(ADB_RESET);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(500);
+	esp_rom_delay_us(500);
 }
 
 static inline void	adb_tx_setup() {
@@ -489,9 +490,9 @@ static inline void	adb_tx_setup() {
 }
 
 static inline void	adb_tx_zero() {
-	/* values from AN591 Datasheet minus the estimated call to ets_delay_us */
+	/* values from AN591 Datasheet minus the estimated call to esp_rom_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
-	ets_delay_us(ADB_0_LOW - 1);
+	esp_rom_delay_us(ADB_0_LOW - 1);
 	gpio_set_level(GPIO_ADB, 1);
-	ets_delay_us(ADB_0_HIGH - 1);
+	esp_rom_delay_us(ADB_0_HIGH - 1);
 }

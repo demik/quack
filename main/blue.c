@@ -25,6 +25,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
@@ -38,7 +39,9 @@
 #include "esp_gatt_defs.h"
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
+#include "esp_timer.h"
 
+#include "esp_hid_common.h"
 #include "esp_hidd.h"
 #include "esp_hidh.h"
 #include "esp_hid_gap.h"
@@ -170,7 +173,7 @@ void	blue_adb2hid(void *pvParameters) {
 	uint16_t data = 0;
 	uint8_t buffer[3] = {0, 0, 0};
 	int8_t move = 0;
-	unsigned int tmp;
+	long unsigned int tmp;
 
 	ESP_LOGD(TAG, "ADB2BT started on core %d", xPortGetCoreID());
 
@@ -373,6 +376,7 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 	uint8_t	i;
 	int8_t x, y;
 
+	//ESP_LOG_BUFFER_HEX(TAG, data, length);
 	buttons = data[0];
 
 	/*
@@ -580,56 +584,8 @@ void blue_scan(void *pvParameters) {
 void blue_set_boot_protocol(esp_hidh_dev_t *dev) {
 	configASSERT(dev != NULL);
 
-	/*
-	 * /!\ Disclaimer /!\
-	 * This is ugly. We are accessing directly bluedroid and need the hidden handle to do that
-	 * Extract it from a private esp_hidh_dev_s struct and call BTA_HhSetProtoMode directly.
-	 */
-
-	struct decoy_dev_s {
-		struct esp_hidh_dev_s   *next;
-
-		esp_hid_device_config_t config;
-		esp_hid_usage_t         usage;
-		esp_hid_transport_t     transport;
-		bool                    connected;
-		bool                    opened;
-		int                     status;
-
-		size_t                  reports_len;
-		void                    *reports;
-
-		void                    *tmp;
-		size_t                  tmp_len;
-
-		xSemaphoreHandle        semaphore;
-
-		esp_err_t               (*close)        (esp_hidh_dev_t *dev);
-		esp_err_t               (*report_write) (esp_hidh_dev_t *dev, size_t map_index, size_t report_id, int report_type, uint8_t *data, size_t len);
-		esp_err_t               (*report_read)  (esp_hidh_dev_t *dev, size_t map_index, size_t report_id, int report_type, size_t max_length, uint8_t *value, size_t *value_len);
-		void                    (*dump)         (esp_hidh_dev_t *dev, FILE *fp);
-
-		esp_bd_addr_t bda;
-
-		struct {
-			esp_bt_cod_t cod;
-			int handle;
-			uint8_t sub_class;
-			uint8_t app_id;
-			uint16_t attr_mask;
-		} bt;
-		TAILQ_ENTRY(esp_hidh_dev_s) devices;
-	};
-
-	struct decoy_dev_s *pass_that_handle;
-	pass_that_handle = (struct decoy_dev_s *)dev;
-
-	ESP_LOGI(TAG, "switching " ESP_BD_ADDR_STR " (%i) to protocol mode boot" ,
-			 ESP_BD_ADDR_HEX(pass_that_handle->bda), pass_that_handle->bt.handle);
-
-	//ESP_LOG_BUFFER_HEX(TAG, dev, sizeof(struct decoy_dev_s));
-	/* bluedroid/bta/include/bta_hh_api.h */
-	BTA_HhSetProtoMode(pass_that_handle->bt.handle, 0x01);
+	ESP_LOGI(TAG, "switching " ESP_BD_ADDR_STR " to protocol mode boot", ESP_BD_ADDR_HEX(esp_hidh_dev_bda_get(dev)));
+	esp_hidh_dev_set_protocol(dev, ESP_HID_PROTOCOL_MODE_BOOT);
 }
 
 static bool blue_support_boot(esp_hidh_dev_t *dev) {

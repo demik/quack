@@ -28,7 +28,6 @@
 #include "esp_system.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "driver/timer.h"
 #include "esp_timer.h"
 
 #include "quad.h"
@@ -40,8 +39,8 @@ esp_timer_handle_t quad_qx, quad_qy;
 
 QueueHandle_t q_qx, q_qy;
 
-/* static functions */
-static void	IRAM_ATTR quad_timer(void* arg);
+/* ISR functions */
+static void	IRAM_ATTR quad_isr(void* arg);
 
 /* phases */
 const bool q1[] = {true, false, false, true};
@@ -50,6 +49,10 @@ const bool q2[] = {true, true, false, false};
 /* init all leds, blink everything once and start background tasks */
 void	quad_init(void) {
 	esp_timer_create_args_t args;
+
+	/* create quadrature queues */
+	q_qx = xQueueCreate(4, sizeof(int8_t));
+	q_qy = xQueueCreate(4, sizeof(int8_t));
 
 	/* create quadrature tasks */
 	xTaskCreate(quad_click, "CLICK", 1024, NULL, tskIDLE_PRIORITY + 1, &t_click);
@@ -66,23 +69,23 @@ void	quad_init(void) {
 	gpio_set_level(GPIO_QY2, q2[0]);
 
 	/* create timers for quadrature phases */
-	args.callback = quad_timer;
+	args.callback = quad_isr;
 	args.arg = t_qx;
 	args.name = "quad_qx";
+	args.dispatch_method = ESP_TIMER_ISR;
 	ESP_ERROR_CHECK(esp_timer_create(&args, &quad_qx));
-	args.callback = quad_timer;
+	args.callback = quad_isr;
 	args.arg = t_qy;
 	args.name = "quad_qy";
+	args.dispatch_method = ESP_TIMER_ISR;
 	ESP_ERROR_CHECK(esp_timer_create(&args, &quad_qy));
-
-	q_qx = xQueueCreate(4, sizeof(int8_t));
-	q_qy = xQueueCreate(4, sizeof(int8_t));
 
 	ESP_LOGI("quad", "Quadrature tasks started on core %d", xPortGetCoreID());
 }
 
+
 void	quad_click(void *pvParameters) {
-	unsigned int click = 0;
+	long unsigned int click = 0;
 
 	(void)pvParameters;
 
@@ -165,7 +168,7 @@ void IRAM_ATTR quad_move_y(void *pvParameters) {
 }
 
 /* simple ISR function. Resume the task that called the oneshot timer */
-static void IRAM_ATTR quad_timer(void* arg) {
+static void IRAM_ATTR quad_isr(void* arg) {
 	BaseType_t pxHigherPriorityTaskWoken = pdFALSE;
 	vTaskNotifyGiveFromISR(arg, &pxHigherPriorityTaskWoken);
 

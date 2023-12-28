@@ -1,19 +1,13 @@
-// Copyright 2017-2019 Espressif Systems (Shanghai) PTE LTD
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
+/*
+ * SPDX-FileCopyrightText: 2021-2022 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Unlicense OR CC0-1.0
+ */
 
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 #include <string.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -24,8 +18,11 @@
 static const char *TAG = "ESP_HID_GAP";
 
 // uncomment to print all devices that were seen during a scan
-#define GAP_DBG_PRINTF(...) //printf(__VA_ARGS__)
-//static const char * gap_bt_prop_type_names[5] = {"","BDNAME","COD","RSSI","EIR"};
+#define GAP_DBG_PRINTF(...) printf(__VA_ARGS__)
+
+#if CONFIG_BT_HID_HOST_ENABLED
+static const char * gap_bt_prop_type_names[5] = {"","BDNAME","COD","RSSI","EIR"};
+#endif
 
 static esp_hid_scan_result_t *bt_scan_results = NULL;
 static size_t num_bt_scan_results = 0;
@@ -33,11 +30,11 @@ static size_t num_bt_scan_results = 0;
 static esp_hid_scan_result_t *ble_scan_results = NULL;
 static size_t num_ble_scan_results = 0;
 
-static xSemaphoreHandle bt_hidh_cb_semaphore = NULL;
+static SemaphoreHandle_t bt_hidh_cb_semaphore = NULL;
 #define WAIT_BT_CB() xSemaphoreTake(bt_hidh_cb_semaphore, portMAX_DELAY)
 #define SEND_BT_CB() xSemaphoreGive(bt_hidh_cb_semaphore)
 
-static xSemaphoreHandle ble_hidh_cb_semaphore = NULL;
+static SemaphoreHandle_t ble_hidh_cb_semaphore = NULL;
 #define WAIT_BLE_CB() xSemaphoreTake(ble_hidh_cb_semaphore, portMAX_DELAY)
 #define SEND_BLE_CB() xSemaphoreGive(ble_hidh_cb_semaphore)
 
@@ -71,6 +68,7 @@ const char *bt_gap_evt_str(uint8_t event)
     return bt_gap_evt_names[event];
 }
 
+#if CONFIG_BT_BLE_ENABLED
 const char *esp_ble_key_type_str(esp_ble_key_type_t key_type)
 {
     const char *key_str = NULL;
@@ -109,6 +107,7 @@ const char *esp_ble_key_type_str(esp_ble_key_type_t key_type)
     }
     return key_str;
 }
+#endif /* CONFIG_BT_BLE_ENABLED */
 
 void esp_hid_scan_results_free(esp_hid_scan_result_t *results)
 {
@@ -123,6 +122,7 @@ void esp_hid_scan_results_free(esp_hid_scan_result_t *results)
     }
 }
 
+#if (CONFIG_BT_HID_HOST_ENABLED || CONFIG_BT_BLE_ENABLED)
 static esp_hid_scan_result_t *find_scan_result(esp_bd_addr_t bda, esp_hid_scan_result_t *results)
 {
     esp_hid_scan_result_t *r = results;
@@ -134,7 +134,9 @@ static esp_hid_scan_result_t *find_scan_result(esp_bd_addr_t bda, esp_hid_scan_r
     }
     return NULL;
 }
+#endif /* (CONFIG_BT_HID_HOST_ENABLED || CONFIG_BT_BLE_ENABLED) */
 
+#if CONFIG_BT_HID_HOST_ENABLED
 static void add_bt_scan_result(esp_bd_addr_t bda, esp_bt_cod_t *cod, esp_bt_uuid_t *uuid, uint8_t *name, uint8_t name_len, int rssi)
 {
     esp_hid_scan_result_t *r = find_scan_result(bda, bt_scan_results);
@@ -186,7 +188,9 @@ static void add_bt_scan_result(esp_bd_addr_t bda, esp_bt_cod_t *cod, esp_bt_uuid
     bt_scan_results = r;
     num_bt_scan_results++;
 }
+#endif
 
+#if CONFIG_BT_BLE_ENABLED
 static void add_ble_scan_result(esp_bd_addr_t bda, esp_ble_addr_type_t addr_type, uint16_t appearance, uint8_t *name, uint8_t name_len, int rssi)
 {
     if (find_scan_result(bda, ble_scan_results)) {
@@ -220,13 +224,14 @@ static void add_ble_scan_result(esp_bd_addr_t bda, esp_ble_addr_type_t addr_type
     ble_scan_results = r;
     num_ble_scan_results++;
 }
+#endif /* CONFIG_BT_BLE_ENABLED */
 
 void print_uuid(esp_bt_uuid_t *uuid)
 {
     if (uuid->len == ESP_UUID_LEN_16) {
         GAP_DBG_PRINTF("UUID16: 0x%04x", uuid->uuid.uuid16);
     } else if (uuid->len == ESP_UUID_LEN_32) {
-        GAP_DBG_PRINTF("UUID32: 0x%08x", uuid->uuid.uuid32);
+        GAP_DBG_PRINTF("UUID32: 0x%08"PRIx32, uuid->uuid.uuid32);
     } else if (uuid->len == ESP_UUID_LEN_128) {
         GAP_DBG_PRINTF("UUID128: %02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x", uuid->uuid.uuid128[0],
                        uuid->uuid.uuid128[1], uuid->uuid.uuid128[2], uuid->uuid.uuid128[3],
@@ -237,6 +242,7 @@ void print_uuid(esp_bt_uuid_t *uuid)
     }
 }
 
+#if CONFIG_BT_HID_HOST_ENABLED
 static void handle_bt_device_result(struct disc_res_param *disc_res)
 {
     GAP_DBG_PRINTF("BT : " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(disc_res->bda));
@@ -325,7 +331,9 @@ static void handle_bt_device_result(struct disc_res_param *disc_res)
         add_bt_scan_result(disc_res->bda, cod, &uuid, name, name_len, rssi);
     }
 }
+#endif
 
+#if CONFIG_BT_BLE_ENABLED
 static void handle_ble_device_result(struct ble_scan_result_evt_param *scan_rst)
 {
 
@@ -371,8 +379,9 @@ static void handle_ble_device_result(struct ble_scan_result_evt_param *scan_rst)
         add_ble_scan_result(scan_rst->bda, scan_rst->ble_addr_type, appearance, adv_name, adv_name_len, scan_rst->rssi);
     }
 }
+#endif /* CONFIG_BT_BLE_ENABLED */
 
-
+#if CONFIG_BT_HID_HOST_ENABLED
 /*
  * BT GAP
  * */
@@ -392,10 +401,10 @@ static void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_para
         break;
     }
     case ESP_BT_GAP_KEY_NOTIF_EVT:
-        ESP_LOGI(TAG, "BT GAP KEY_NOTIF passkey:%d", param->key_notif.passkey);
+        ESP_LOGI(TAG, "BT GAP KEY_NOTIF passkey:%"PRIu32, param->key_notif.passkey);
         break;
     default:
-        ESP_LOGV(TAG, "BT GAP EVENT %s", bt_gap_evt_str(event));
+        ESP_LOGW(TAG, "BT GAP EVENT %s", bt_gap_evt_str(event));
         break;
     }
 }
@@ -403,9 +412,12 @@ static void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_para
 static esp_err_t init_bt_gap(void)
 {
     esp_err_t ret;
+#if (CONFIG_BT_SSP_ENABLED)
+    /* Set default parameters for Secure Simple Pairing */
     esp_bt_sp_param_t param_type = ESP_BT_SP_IOCAP_MODE;
     esp_bt_io_cap_t iocap = ESP_BT_IO_CAP_IO;
     esp_bt_gap_set_security_param(param_type, &iocap, sizeof(uint8_t));
+#endif
     /*
      * Set default parameters for Legacy Pairing
      * Use fixed pin code
@@ -440,7 +452,9 @@ static esp_err_t start_bt_scan(uint32_t seconds)
     }
     return ret;
 }
+#endif
 
+#if CONFIG_BT_BLE_ENABLED
 /*
  * BLE GAP
  * */
@@ -506,13 +520,13 @@ static void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
     case ESP_GAP_BLE_PASSKEY_NOTIF_EVT: // ESP_IO_CAP_OUT
         // The app will receive this evt when the IO has Output capability and the peer device IO has Input capability.
         // Show the passkey number to the user to input it in the peer device.
-        ESP_LOGI(TAG, "BLE GAP PASSKEY_NOTIF passkey:%d", param->ble_security.key_notif.passkey);
+        ESP_LOGI(TAG, "BLE GAP PASSKEY_NOTIF passkey:%"PRIu32, param->ble_security.key_notif.passkey);
         break;
 
     case ESP_GAP_BLE_NC_REQ_EVT: // ESP_IO_CAP_IO
         // The app will receive this event when the IO has DisplayYesNO capability and the peer device IO also has DisplayYesNo capability.
         // show the passkey number to the user to confirm it with the number displayed by peer device.
-        ESP_LOGI(TAG, "BLE GAP NC_REQ passkey:%d", param->ble_security.key_notif.passkey);
+        ESP_LOGI(TAG, "BLE GAP NC_REQ passkey:%"PRIu32, param->ble_security.key_notif.passkey);
         esp_ble_confirm_reply(param->ble_security.key_notif.bd_addr, true);
         break;
 
@@ -662,6 +676,7 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
     };
     return esp_ble_gap_start_advertising(&hidd_adv_params);
 }
+#endif /* CONFIG_BT_BLE_ENABLED */
 
 /*
  * CONTROLLER INIT
@@ -671,11 +686,16 @@ static esp_err_t init_low_level(uint8_t mode)
 {
     esp_err_t ret;
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+#if CONFIG_IDF_TARGET_ESP32
+    bt_cfg.mode = mode;
+#endif
+#if CONFIG_BT_HID_HOST_ENABLED
     if (mode & ESP_BT_MODE_CLASSIC_BT) {
-        bt_cfg.mode = mode;
         bt_cfg.bt_max_acl_conn = 3;
         bt_cfg.bt_max_sync_conn = 3;
-    } else {
+    } else
+#endif
+    {
         ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
         if (ret) {
             ESP_LOGE(TAG, "esp_bt_controller_mem_release failed: %d", ret);
@@ -705,25 +725,24 @@ static esp_err_t init_low_level(uint8_t mode)
         ESP_LOGE(TAG, "esp_bluedroid_enable failed: %d", ret);
         return ret;
     }
-
+#if CONFIG_BT_HID_HOST_ENABLED
     if (mode & ESP_BT_MODE_CLASSIC_BT) {
         ret = init_bt_gap();
         if (ret) {
             return ret;
         }
     }
-
+#endif
+#if CONFIG_BT_BLE_ENABLED
     if (mode & ESP_BT_MODE_BLE) {
         ret = init_ble_gap();
         if (ret) {
             return ret;
         }
     }
+#endif /* CONFIG_BT_BLE_ENABLED */
     return ret;
 }
-
-
-
 
 esp_err_t esp_hid_gap_init(uint8_t mode)
 {
@@ -771,14 +790,21 @@ esp_err_t esp_hid_scan(uint32_t seconds, size_t *num_results, esp_hid_scan_resul
         return ESP_FAIL;
     }
 
+#if CONFIG_BT_BLE_ENABLED
     if (start_ble_scan(seconds) == ESP_OK) {
-        if (start_bt_scan(seconds) == ESP_OK) {
-            WAIT_BT_CB();
-        }
         WAIT_BLE_CB();
     } else {
         return ESP_FAIL;
     }
+#endif /* CONFIG_BT_BLE_ENABLED */
+
+#if CONFIG_BT_HID_HOST_ENABLED
+    if (start_bt_scan(seconds) == ESP_OK) {
+        WAIT_BT_CB();
+    } else {
+        return ESP_FAIL;
+    }
+#endif
 
     *num_results = num_bt_scan_results + num_ble_scan_results;
     *results = bt_scan_results;
