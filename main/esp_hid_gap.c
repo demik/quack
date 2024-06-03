@@ -381,14 +381,16 @@ static void handle_ble_device_result(struct ble_scan_result_evt_param *scan_rst)
 }
 #endif /* CONFIG_BT_BLE_ENABLED */
 
+#warning here1
 #if CONFIG_BT_HID_HOST_ENABLED
 /*
  * BT GAP
  * */
 
-static void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
+#warning here2
+void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
 {
-    switch (event) {
+	switch (event) {
     case ESP_BT_GAP_DISC_STATE_CHANGED_EVT: {
         ESP_LOGV(TAG, "BT GAP DISC_STATE %s", (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STARTED) ? "START" : "STOP");
         if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STOPPED) {

@@ -34,9 +34,11 @@
 #include "nvs_flash.h"
 #include "esp_bt.h"
 #include "esp_bt_defs.h"
+#if CONFIG_BT_BLE_ENABLED
 #include "esp_gap_ble_api.h"
 #include "esp_gatts_api.h"
 #include "esp_gatt_defs.h"
+#endif
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
 #include "esp_timer.h"
@@ -75,8 +77,8 @@ static esp_hid_raw_report_map_t	*blue_hid_rm_get(esp_hidh_dev_t *dev);
 void blue_set_boot_protocol(esp_hidh_dev_t *dev);
 static bool blue_support_boot(esp_hidh_dev_t *dev);
 
-/* direct calls to bluedroid */
-extern void BTA_HhSetProtoMode(uint8_t handle, uint8_t t_type);
+/* direct calls to esp_hid_* */
+void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param);
 
 /* Device specific functions blue_d_* */
 static void blue_d_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
@@ -133,22 +135,21 @@ static void blue_d_connect() {
 static void blue_d_disconnect(esp_hidd_event_data_t *dev) {
 	ESP_LOGI(TAG, "Host disconnected, reason: %s",
 			 esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(dev->disconnect.dev), dev->disconnect.reason));
+#if CONFIG_BT_BLE_ENABLED
 	esp_hid_ble_gap_adv_start();
+#endif
 	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 }
 
 static void blue_d_init() {
 	esp_err_t	ret;
 
-	ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_MOUSE, m4848_config.device_name);
-	ESP_ERROR_CHECK( ret );
-
-	if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {
-		ESP_LOGE(TAG, "GATTS register callback failed: %d", ret);
+	if ((ret = esp_bt_gap_register_callback(bt_gap_event_handler)) != ESP_OK) {
+		ESP_LOGE(TAG, "BT GAP register callback failed: %d", ret);
 		return;
 	}
 
-	ESP_ERROR_CHECK(esp_hidd_dev_init(&m4848_config, ESP_HID_TRANSPORT_BLE, blue_d_callback, &hid_dev));
+	ESP_ERROR_CHECK(esp_hidd_dev_init(&m4848_config, ESP_HID_TRANSPORT_BT, blue_d_callback, &hid_dev));
 	xTaskCreate(blue_adb2hid, "ADB2BT", 2 * 1024, NULL, tskIDLE_PRIORITY + 1, &t_adb2hid);
 }
 
@@ -161,12 +162,16 @@ static void blue_d_start()
 {
 	ESP_LOGD(TAG, "Bluetooth stack started");
 	xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+#if CONFIG_BT_BLE_ENABLED
 	esp_hid_ble_gap_adv_start();
+#endif
 }
 
 /*
  * Called by the ADB stack from adb_task_host on mouse activity
  * Convert the 16bit ADB data to a 3 bytes HID INPUT REPORT matching the m4848
+ *
+ * The format is also BOOT compatible so don't bother to check what mode we are in
  */
 
 void	blue_adb2hid(void *pvParameters) {
@@ -335,9 +340,7 @@ void blue_init(void)
 
 	ESP_LOGD(TAG, "Starting Bluetooth init on core %d", xPortGetCoreID());
 	ESP_ERROR_CHECK(ret);
-	/* ESP_BT_MODE_CLASSIC_BT doesn't work, it freezes esp_hidh_init */
-	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_BTDM));
-	ESP_ERROR_CHECK(esp_ble_gattc_register_callback(esp_hidh_gattc_event_handler));
+	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_CLASSIC_BT));
 
 	esp_log_level_set("event", ESP_LOG_INFO);
 	/* complains about wrong data len on BOOT mode and CCONTROL */
@@ -555,12 +558,11 @@ void blue_scan(void *pvParameters) {
         esp_hid_scan_result_t *r = results;
 
         while (r) {
-            ESP_LOGI(TAG, "found %s %s device: " ESP_BD_ADDR_STR ", RSSI: %d, NAME: %s",
-					 (r->transport == ESP_HID_TRANSPORT_BLE) ? "BLE" : "BT",
-					 esp_hid_cod_major_str(r->bt.cod.major),
-					 ESP_BD_ADDR_HEX(r->bda), r->rssi, r->name ? r->name : "");
+			/*
+			 * as of v1.4.5, esp_hid_gap will print detected devices in console (handle_bt_device_result())
+			 * just look for something that looks like Bluetooth Classic mouse
+			 */
 
-			/* search for something that looks like Bluetooth Classic mouse */
             if (r->transport == ESP_HID_TRANSPORT_BT &&
 				strcmp("PERIPHERAL", esp_hid_cod_major_str(r->bt.cod.major)) == 0
 				&& (r->bt.cod.minor & ESP_HID_COD_MIN_MOUSE)) {
