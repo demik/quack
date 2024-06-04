@@ -59,7 +59,8 @@ void	adb_tx_reset(void);
 
 /* Device addresses */
 #define ADB_MOUSE	(3<<4)
-#define ADB_TMP		(9<<4)
+#define ADB_KML1	(8<<4)	// disabled Kensington device
+#define ADB_TMP	(9<<4)
 
 /* Various stuff */
 #define ADB_B_UP	0
@@ -70,6 +71,7 @@ void	adb_tx_reset(void);
 #define ADB_H_C100	0x01	// Handler 1 (Classic @ 100cpi)
 #define ADB_H_C200	0x02	// Handler 2 (Classic @ 200cpi)
 #define ADB_H_MTRC	0x2f	// Handler for MacTRAC 2.0
+#define ADB_H_KSGT	0x32	// Handler for Kensington devices
 #define ADB_H_MOVE	0xfe	// Move to another address
 
 /* Host states */

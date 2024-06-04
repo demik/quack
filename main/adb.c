@@ -127,7 +127,7 @@ inline bool	adb_is_host(void) {
 void adb_probe(void) {
 	uint16_t	register3;
 
-	ESP_LOGI(TAG, "Probing for mouse...");
+	ESP_LOGI(TAG, "Probing for mouse…");
 	xTaskNotify(t_yellow, LED_SLOW, eSetValueWithOverwrite);
 
 	/* for some reason, RMT misses the first exchange sometimes. Flush the device should give it time */
@@ -138,15 +138,49 @@ void adb_probe(void) {
 	while (true) {
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
 		register3 = adb_rx_mouse();
-		ESP_LOGD("ADB", "Device $3 register3: %x", register3);
+		ESP_LOGD("ADB", "Device $3 register3: %04x", register3);
 
 		if (register3 && (register3 & ADB_H_ALL) == ADB_H_ERR)
 			ESP_LOGE(TAG, "Mouse failed self init test");
 
+		/*
+		 * try to unglue composite devices (Kensington)
+		 * the idea is to move detected devices to $9, and check $3 again
+		 * if there is something again at $3, it may be a composite device, or the user
+		 * plugged two devices.
+		 * if there is nothing anymore, move back $9 to $3
+		 *
+		 * we will handle that further down the line by checking the handler
+		 */
+		if (register3 & ADB_H_ALL) {
+			ESP_LOGI(TAG, "\tMoving $3 to $9 to check for composite devices");
+			adb_tx_listen(ADB_MOUSE|ADB_LISTEN|ADB_REG3, (ADB_TMP<<4)|ADB_H_MOVE);
+			vTaskDelay(7 / portTICK_PERIOD_MS);
+			ESP_LOGI(TAG, "\tChecking $3 again…");
+			adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
+			register3 = adb_rx_mouse();
+			if (register3) {
+				adb_tx_cmd(ADB_TMP|ADB_TALK|ADB_REG3);
+				register3 = adb_rx_mouse();
+				ESP_LOGI(TAG, "\t… something was there, $9 handler: $%02x", register3 & ADB_H_ALL);
+				xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+			}
+			else {
+				ESP_LOGI(TAG, "\t… nothing, moving $9 back to $3");
+				adb_tx_listen(ADB_TMP|ADB_LISTEN|ADB_REG3, (ADB_MOUSE<<4)|ADB_H_MOVE);
+			}
+
+			/* restore register3 from $3 for handler detection */
+			vTaskDelay(7 / portTICK_PERIOD_MS);
+			adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
+			register3 = adb_rx_mouse();
+		}
+
 		/* Accept all known handlers */
 		if (((register3 & ADB_H_ALL) == ADB_H_C100) || ((register3 & ADB_H_ALL) == ADB_H_C200) ||
-			((register3 & ADB_H_ALL) == ADB_H_MTRC)) {
-			ESP_LOGI(TAG, "... detected mouse at $3");
+			((register3 & ADB_H_ALL) == ADB_H_MTRC) || ((register3 & ADB_H_ALL) == ADB_H_KSGT)) {
+			ESP_LOGI(TAG, "… detected mouse at $3");
+
 			break;
 		}
 
@@ -171,6 +205,13 @@ void adb_probe(void) {
 			break;
 		case ADB_H_MTRC:
 			ESP_LOGD(TAG, "MacTRAC running at default cpi");
+			break;
+		case ADB_H_KSGT:
+			ESP_LOGD(TAG, "Kensington detected, switching to standard device");
+			adb_tx_listen(ADB_MOUSE|ADB_LISTEN|ADB_REG3, (ADB_KML1<<4)|ADB_H_MOVE);
+			adb_tx_listen(ADB_TMP|ADB_LISTEN|ADB_REG3, (ADB_MOUSE<<4)|ADB_H_MOVE);
+			adb_tx_listen(ADB_MOUSE|ADB_LISTEN|ADB_REG3, 0x6000|(ADB_MOUSE<<4)|ADB_H_C200);
+			ESP_LOGD(TAG, "Kensington running at 200cpi");
 			break;
 		default:
 			ESP_LOGE(TAG, "Mouse running with unknow handler: %x", register3 & ADB_H_ALL);
@@ -268,7 +309,7 @@ void	adb_task_host(void *pvParameters) {
 					else
 						state = ADB_S_KEEP;
 				}
-				ESP_LOGD("ADB", "Check mouse presence %x", data);
+				ESP_LOGD("ADB", "Check mouse presence %04x", data);
 			}
 		}
 	}
