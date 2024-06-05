@@ -59,6 +59,7 @@ static void	adb_rx_setup(void);
 static void	adb_tx_as(void);
 static void	adb_tx_one(void);
 static void	adb_tx_setup(void);
+static void	adb_tx_stop(void);
 static void	adb_tx_zero(void);
 
 /* functions */
@@ -136,6 +137,7 @@ void adb_probe(void) {
 	vTaskDelay(12 / portTICK_PERIOD_MS);
 
 	while (true) {
+
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
 		register3 = adb_rx_mouse();
 		ESP_LOGD("ADB", "Device $3 register3: %04x", register3);
@@ -239,9 +241,9 @@ static void	adb_rmt_reset() {
 void	adb_task_host(void *pvParameters) {
 	/* Classic Apple Mouse Protocol is 16 bits long */
 	uint16_t	data;
-	uint8_t		last = 0;
-	int8_t		move = 0;
-	uint8_t		state = ADB_S_PROBE;
+	uint8_t	last = 0;
+	int8_t	move = 0;
+	uint8_t	state = ADB_S_PROBE;
 
 	/* put green led to steady if BT is disabled. Otherwise BT init will do it */
 	if (gpio_get_level(GPIO_BTOFF) == 0)
@@ -442,11 +444,15 @@ static inline void	adb_rx_setup() {
 }
 
 static inline void	adb_tx_as() {
-	/* send attention (800 µs low) + sync (70 µs high) */
+	/*
+	 * send attention (800 µs low) + sync (65 µs high).
+	 * AN591 mentions 70 µs which is a mistake, make some devices angry
+	 */
+
 	gpio_set_level(GPIO_ADB, 0);
 	esp_rom_delay_us(800-1);
 	gpio_set_level(GPIO_ADB, 1);
-	esp_rom_delay_us(70-1);
+	esp_rom_delay_us(65-1);
 }
 
 void IRAM_ATTR adb_tx_cmd(unsigned char cmd) {
@@ -464,13 +470,12 @@ void IRAM_ATTR adb_tx_cmd(unsigned char cmd) {
 	cmd & 0x01 ? adb_tx_one() : adb_tx_zero();
 
 	/* stop bit */
-	adb_tx_zero();
+	adb_tx_stop();
 	adb_rx_setup();
 }
 
 void IRAM_ATTR adb_tx_data(uint16_t data) {
 	adb_tx_setup();
-
 	adb_tx_one();
 
 	/* send data 2 bytes (unrolled loop) */
@@ -492,20 +497,23 @@ void IRAM_ATTR adb_tx_data(uint16_t data) {
 	data & 0x01 ? adb_tx_one() : adb_tx_zero();
 
 	/* stop bit */
-	adb_tx_zero();
+	adb_tx_stop();
 	adb_rx_setup();
 }
 
 void	adb_tx_listen(unsigned char cmd, uint16_t data) {
 	adb_tx_cmd(cmd);
 
-	/* Stop to start is between 160-240µS. Go for around 160 + time for GPIO setup */
+	/*
+	 * Stop to start is between 160-240µS. Go for around 160 + time for GPIO setup
+	 * values from AN591 Datasheet minus the estimated call to esp_rom_delay_us
+	 */
+
 	esp_rom_delay_us(160);
 	adb_tx_data(data);
 }
 
 static inline void	adb_tx_one() {
-	/* values from AN591 Datasheet minus the estimated call to esp_rom_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
 	esp_rom_delay_us(ADB_1_LOW - 1);
 	gpio_set_level(GPIO_ADB, 1);
@@ -530,8 +538,14 @@ static inline void	adb_tx_setup() {
 	gpio_set_level(GPIO_DIR, 1);
 }
 
+static inline void	adb_tx_stop() {
+	gpio_set_level(GPIO_ADB, 0);
+	esp_rom_delay_us(ADB_S_LOW - 1);
+	gpio_set_level(GPIO_ADB, 1);
+	esp_rom_delay_us(ADB_S_HIGH - 1);
+}
+
 static inline void	adb_tx_zero() {
-	/* values from AN591 Datasheet minus the estimated call to esp_rom_delay_us */
 	gpio_set_level(GPIO_ADB, 0);
 	esp_rom_delay_us(ADB_0_LOW - 1);
 	gpio_set_level(GPIO_ADB, 1);

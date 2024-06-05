@@ -43,6 +43,8 @@ void	adb_tx_reset(void);
 #define ADB_0_HIGH	35
 #define ADB_1_LOW	35
 #define ADB_1_HIGH	65
+#define ADB_S_LOW	70
+#define ADB_S_HIGH	30
 
 /* Classic Apple Mouse Protocol bitmasks */
 #define ADB_CMP_B1	(1<<15)
@@ -58,9 +60,9 @@ void	adb_tx_reset(void);
 #define ADB_REG3	0x3
 
 /* Device addresses */
-#define ADB_MOUSE	(3<<4)
+#define ADB_MOUSE	(3<<4)	// main device
 #define ADB_KML1	(8<<4)	// disabled Kensington device
-#define ADB_TMP	(9<<4)
+#define ADB_TMP	(9<<4)	// temporary device
 
 /* Various stuff */
 #define ADB_B_UP	0
