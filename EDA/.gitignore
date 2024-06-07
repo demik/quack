@@ -1,6 +1,9 @@
 # tmp zip files
 *.zip
 
+# production folders
+production
+
 # KiCad backup files
 *bak
 
