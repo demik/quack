@@ -161,6 +161,7 @@ void adb_probe(void) {
 			ESP_LOGI(TAG, "\tChecking $3 again…");
 			adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
 			register3 = adb_rx_mouse();
+			vTaskDelay(7 / portTICK_PERIOD_MS);
 			if (register3) {
 				adb_tx_cmd(ADB_TMP|ADB_TALK|ADB_REG3);
 				register3 = adb_rx_mouse();
