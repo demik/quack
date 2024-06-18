@@ -1,3 +1,7 @@
+## v1.4.7
+- new feature: half click on right BT click (similar to some ADB devices)
+- workarounds for v1.4.6 green led regression
+
 ## v1.4.6
 - added support for ADB composite devices (Kensignton and some Joysticks)
 - fixed ADB start and stop bit times (65 µs vs 70 µs, error in AN591)

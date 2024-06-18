@@ -246,8 +246,11 @@ void	adb_task_host(void *pvParameters) {
 	int8_t	move = 0;
 	uint8_t	state = ADB_S_PROBE;
 
-	/* wait a little for the LED tasks to start on the other core */
-	vTaskDelay(200 / portTICK_PERIOD_MS);
+     /*
+      * wait a little for the LED tasks to start on the other core
+      * starting IDF 5.2.2, we need this. Looks like the init is now too fast on app core
+      */
+     vTaskDelay(200 / portTICK_PERIOD_MS);
 
 	/* put green led to steady if BT is disabled. Otherwise BT init will do it */
 	if (gpio_get_level(GPIO_BTOFF) == 0)

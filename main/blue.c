@@ -285,31 +285,48 @@ void blue_h_close(esp_hidh_event_data_t *p) {
 }
 
 static void	blue_handle_button(uint8_t buttons) {
+	static bool	locked = false;
+	static bool	releasable = true;
 	static bool	status = BLUE_BUTTON_N;	// Keep state
 
 	buttons = buttons & (BLUE_BUTTON_1 | BLUE_BUTTON_2 | BLUE_BUTTON_3);
 
 	if (status && buttons)
 		return ;
-	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N)
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N && !locked)
 		return ;
+	if (buttons == BLUE_BUTTON_2 && locked && !releasable)
+		return ;
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N && locked) {
+		releasable = true;
+		return ;
+	}
 
 	/* release button */
-	if (status && buttons == BLUE_BUTTON_N) {
+	if (status && buttons == BLUE_BUTTON_N && !locked) {
 		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
 		status = 0;
 		ESP_LOGD(TAG, "button released");
 		return ;
 	}
 
-	/* press button */
+	/* stick button on right click */
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_2 && !locked) {
+		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
+		locked = true;
+		releasable = false;
+		ESP_LOGD(TAG, "button locked");
+		return ;
+	}
+
+	/* press button (simple click) */
 	if (status == BLUE_BUTTON_N && buttons) {
 		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
+		locked = false;
 		status = 1;
 		ESP_LOGD(TAG, "button pressed");
 		return ;
 	}
-
 }
 
 static void blue_h_init(void) {
@@ -346,13 +363,16 @@ void blue_init(void)
 	/* complains about wrong data len on BOOT mode and CCONTROL */
 	esp_log_level_set("BT_HIDH", ESP_LOG_ERROR);
 
-    /*
-     * at this point, everything but bluetooth is started.
-     * put green steady, start blinking blue and keep scanning until a device is found
-     */
+	/*
+	 * at this point, everything but bluetooth is started.
+	 * put green steady, start blinking blue and keep scanning until a device is found
+	 *
+	 * starting IDF 5.2.2, sometimes the first xTaskNotify() call may be lost. why ?
+	 */
 
-    xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
-    xTaskNotify(t_blue, LED_FAST, eSetValueWithOverwrite);
+	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+	xTaskNotify(t_blue, LED_FAST, eSetValueWithOverwrite);
 
 	if (adb_is_host())
 		blue_d_init();
@@ -384,7 +404,7 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 
 	/*
 	 * A friend of mine did this for a beer, it helps a little with high DPI mouses
-	 * This is a precalculated table that looks like a squadhed arctan()
+	 * This is a precalculated table that looks like a squared arctan()
 	 */
 
 	const unsigned char hid2quad[] = {
@@ -467,11 +487,11 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 }
 
 void blue_h_open(esp_hidh_event_data_t *p) {
-    const uint8_t *bda = NULL;
+	const uint8_t *bda = NULL;
 
 	configASSERT(p != NULL);
-    bda = esp_hidh_dev_bda_get(p->open.dev);
-    ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
+	bda = esp_hidh_dev_bda_get(p->open.dev);
+	ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 
 	/* Dump various info on console */
 	blue_hid_rm_get(p->open.dev);
@@ -482,8 +502,8 @@ void blue_h_open(esp_hidh_event_data_t *p) {
 	}
 
 	blue_pointers++;
-    xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
-    gpio_output_enable();
+	xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
+	gpio_output_enable();
 }
 
 /* get specific report from report map matching specified usage + type + protocol */
