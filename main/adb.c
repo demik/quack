@@ -50,12 +50,13 @@ extern QueueHandle_t q_qx, q_qy;
 
 /* static defines */
 static void	adb_handle_button(bool action);
-static void adb_rmt_reset(void);
+static void	adb_rmt_reset(void);
 static bool	adb_rx_isone(rmt_item32_t cell);
 static bool	adb_rx_isstop(rmt_item32_t cell);
 static bool	adb_rx_iszero(rmt_item32_t cell);
 static uint16_t	IRAM_ATTR adb_rx_mouse();
 static void	adb_rx_setup(void);
+static void	adb_scan_macaj(void);
 static void	adb_tx_as(void);
 static void	adb_tx_one(void);
 static void	adb_tx_setup(void);
@@ -181,11 +182,16 @@ void adb_probe(void) {
 
 		/* Accept all known handlers */
 		if (((register3 & ADB_H_ALL) == ADB_H_C100) || ((register3 & ADB_H_ALL) == ADB_H_C200) ||
-			((register3 & ADB_H_ALL) == ADB_H_MTRC) || ((register3 & ADB_H_ALL) == ADB_H_KSGT)) {
+			((register3 & ADB_H_ALL) == ADB_H_MTRC) || ((register3 & ADB_H_ALL) == ADB_H_KSGT) ||
+			((register3 & ADB_H_ALL) == ADB_H_MACJ)) {
 			ESP_LOGI(TAG, "… detected mouse at $3");
 
 			break;
 		}
+
+		/* try to find other misc devices */
+		if (!register3)
+			adb_scan_macaj();
 
 		vTaskDelay(500 / portTICK_PERIOD_MS);
 	}
@@ -205,6 +211,9 @@ void adb_probe(void) {
 			break;
 		case ADB_H_C200:
 			ESP_LOGD(TAG, "Mouse running at 200cpi");
+			break;
+		case ADB_H_MACJ:
+			ESP_LOGD(TAG, "MacAlly Joystick running at default cpi");
 			break;
 		case ADB_H_MTRC:
 			ESP_LOGD(TAG, "MacTRAC running at default cpi");
@@ -237,6 +246,38 @@ static void	adb_rmt_reset() {
 
 	gpio_set_level(GPIO_ADB, 1);
 	adb_tx_reset();
+}
+
+/*
+ * MacAlly Joystick uses address $5 instead of the classic $3
+ * First check that it's in mouse mode emulation then switch it to $3
+ * We should then be able to use the base code path
+ *
+ * https://github.com/lampmerchant/tashnotes/blob/main/macintosh/adb/protocols/macally_joystick.md
+ */
+
+static void	adb_scan_macaj() {
+	uint16_t	register1;
+
+	/* the joystick will not move if we don't don't talk to register 3 first */
+	vTaskDelay(7 / portTICK_PERIOD_MS);
+	adb_tx_cmd(ADB_MACAJ|ADB_TALK|ADB_REG3);
+	adb_rx_mouse();
+	vTaskDelay(7 / portTICK_PERIOD_MS);
+	adb_tx_cmd(ADB_MACAJ|ADB_TALK|ADB_REG1);
+	register1 = adb_rx_mouse();
+
+	if (register1 == 0xAAAA) {
+		ESP_LOGD(TAG, "MacAlly Joystick in joystick mode detected, switching modes");
+		adb_tx_listen(ADB_MACAJ|ADB_LISTEN|ADB_REG1, 0xAAAA);
+		vTaskDelay(7 / portTICK_PERIOD_MS);
+		adb_tx_cmd(ADB_MACAJ|ADB_TALK|ADB_REG1);
+		register1 = adb_rx_mouse();
+	}
+	if (register1 == 0x5555) {
+		ESP_LOGD(TAG, "MacAlly Joystick in mouse mode detected, moving it to $3");
+		adb_tx_listen(ADB_MACAJ|ADB_LISTEN|ADB_REG3, (ADB_MOUSE<<4)|ADB_H_MOVE);
+	}
 }
 
 void	adb_task_host(void *pvParameters) {

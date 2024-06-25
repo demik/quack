@@ -1,3 +1,6 @@
+## v1.4.8
+- added support for MacAlly Joystick
+
 ## v1.4.7
 - new feature: half click on right BT click (similar to some ADB devices)
 - workarounds for v1.4.6 green led regression

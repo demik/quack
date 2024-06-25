@@ -57,10 +57,13 @@ void	adb_tx_reset(void);
 #define ADB_LISTEN	0x8
 #define ADB_FLUSH	0x1
 #define ADB_REG0	0x0
+#define ADB_REG1	0x1
+#define ADB_REG2	0x2
 #define ADB_REG3	0x3
 
 /* Device addresses */
 #define ADB_MOUSE	(3<<4)	// main device
+#define ADB_MACAJ	(5<<4)	// lost MacAlly Joystick
 #define ADB_KML1	(8<<4)	// disabled Kensington device
 #define ADB_TMP	(9<<4)	// temporary device
 
@@ -72,6 +75,7 @@ void	adb_tx_reset(void);
 #define ADB_H_ERR	0x00	// Handler 0 (Self init error)
 #define ADB_H_C100	0x01	// Handler 1 (Classic @ 100cpi)
 #define ADB_H_C200	0x02	// Handler 2 (Classic @ 200cpi)
+#define ADB_H_MACJ	0x03	// Handler for MacAlly Joystick
 #define ADB_H_MTRC	0x2f	// Handler for MacTRAC 2.0
 #define ADB_H_KSGT	0x32	// Handler for Kensington devices
 #define ADB_H_MOVE	0xfe	// Move to another address
