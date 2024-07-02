@@ -19,7 +19,7 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 <br>
 
 <img
-    src = 'Resources/Preview.png'
+    src = 'Images/Preview.png'
     width = 500
 />
 
@@ -32,11 +32,11 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 #### Systems
 
-<kbd>  Macintosh 128 / 512 / Plus  </kbd>  <kbd>  Apple Lisa  </kbd>
+<kbd>  Macintosh 128 / 512 / Plus  </kbd>  <kbd>  Apple Lisa  </kbd>  <kbd>  Apple IIc  </kbd>
 
 #### Connection Types
 
-<kbd>  Apple Desktop Bus  </kbd>  <kbd>  Bluetooth 2+  </kbd>
+<kbd>  Apple Desktop Bus  </kbd>  <kbd>  Bluetooth Classic 2+  </kbd>
 
 <br>
 <br>
