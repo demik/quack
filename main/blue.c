@@ -593,7 +593,11 @@ void blue_scan(void *pvParameters) {
 
         /* try to connect to the last candidate found */
         if (mouse)
+#if CONFIG_BT_BLE_ENABLED
             esp_hidh_dev_open(mouse->bda, mouse->transport, mouse->ble.addr_type);
+#else
+            esp_hidh_dev_open(mouse->bda, mouse->transport, NULL);
+#endif
         else
             ESP_LOGI(TAG, "devices found but no mouse detected");
 
