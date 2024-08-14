@@ -243,7 +243,7 @@ void print_uuid(esp_bt_uuid_t *uuid)
 }
 
 #if CONFIG_BT_HID_HOST_ENABLED
-static void handle_bt_device_result(struct disc_res_param *disc_res)
+void handle_bt_device_result(struct disc_res_param *disc_res)
 {
     GAP_DBG_PRINTF("BT : " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(disc_res->bda));
     uint32_t codv = 0;
@@ -381,16 +381,17 @@ static void handle_ble_device_result(struct ble_scan_result_evt_param *scan_rst)
 }
 #endif /* CONFIG_BT_BLE_ENABLED */
 
-#warning here1
 #if CONFIG_BT_HID_HOST_ENABLED
 /*
  * BT GAP
  * */
 
-#warning here2
+/* quack patch */
+uint8_t	blue_get_pin_code(esp_bd_addr_t bda, esp_bt_pin_code_t pin);
+
 void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *param)
 {
-	switch (event) {
+    switch (event) {
     case ESP_BT_GAP_DISC_STATE_CHANGED_EVT: {
         ESP_LOGV(TAG, "BT GAP DISC_STATE %s", (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STARTED) ? "START" : "STOP");
         if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STOPPED) {
@@ -402,9 +403,36 @@ void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
         handle_bt_device_result(&param->disc_res);
         break;
     }
+#if (CONFIG_EXAMPLE_SSP_ENABLED)
     case ESP_BT_GAP_KEY_NOTIF_EVT:
         ESP_LOGI(TAG, "BT GAP KEY_NOTIF passkey:%"PRIu32, param->key_notif.passkey);
         break;
+    case ESP_BT_GAP_CFM_REQ_EVT: {
+        ESP_LOGI(TAG, "BT GAP CFM_REQ_EVT Please compare the numeric value: %"PRIu32, param->cfm_req.num_val);
+        esp_bt_gap_ssp_confirm_reply(param->cfm_req.bda, true);
+        break;
+    }
+    case ESP_BT_GAP_KEY_REQ_EVT:
+        ESP_LOGI(TAG, "BT GAP KEY_REQ_EVT Please enter passkey!");
+        break;
+#endif
+    case ESP_BT_GAP_MODE_CHG_EVT:
+        ESP_LOGI(TAG, "BT GAP MODE_CHG_EVT mode:%d", param->mode_chg.mode);
+        break;
+    case ESP_BT_GAP_PIN_REQ_EVT: {
+        ESP_LOGI(TAG, "BT GAP PIN_REQ_EVT min_16_digit:%d", param->pin_req.min_16_digit);
+        if (param->pin_req.min_16_digit) {
+            ESP_LOGI(TAG, "Input pin code: 0000 0000 0000 0000");
+            esp_bt_pin_code_t pin_code = {0};
+            esp_bt_gap_pin_reply(param->pin_req.bda, true, 16, pin_code);
+        } else {
+            esp_bt_pin_code_t pin_code;
+            uint8_t pin_len;
+            pin_len = blue_get_pin_code(param->pin_req.bda, pin_code);
+            esp_bt_gap_pin_reply(param->pin_req.bda, true, pin_len, pin_code);
+        }
+        break;
+    }
     default:
         ESP_LOGW(TAG, "BT GAP EVENT %s", bt_gap_evt_str(event));
         break;
@@ -422,15 +450,11 @@ static esp_err_t init_bt_gap(void)
 #endif
     /*
      * Set default parameters for Legacy Pairing
-     * Use fixed pin code
+     * Use variable pin, input pin code when pairing
      */
-    esp_bt_pin_type_t pin_type = ESP_BT_PIN_TYPE_FIXED;
+    esp_bt_pin_type_t pin_type = ESP_BT_PIN_TYPE_VARIABLE;
     esp_bt_pin_code_t pin_code;
-    pin_code[0] = '0';
-    pin_code[1] = '0';
-    pin_code[2] = '0';
-    pin_code[3] = '0';
-    esp_bt_gap_set_pin(pin_type, 4, pin_code);
+    esp_bt_gap_set_pin(pin_type, 0, pin_code);
 
     if ((ret = esp_bt_gap_register_callback(bt_gap_event_handler)) != ESP_OK) {
         ESP_LOGE(TAG, "esp_bt_gap_register_callback failed: %d", ret);

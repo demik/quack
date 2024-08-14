@@ -31,15 +31,17 @@
 #define	BLUE_BUTTON_1 (1 << 0)
 #define	BLUE_BUTTON_2 (1 << 1)
 #define	BLUE_BUTTON_3 (1 << 2)
-#define BLUE_BUTTON_E 0xF8		/* shouldn't happen */
+#define	BLUE_BUTTON_E 0xF8		/* shouldn't happen */
 
 /* prototypes */
 void	blue_adb2hid(void *pvParameters);
 void	blue_init(void);
-void	blue_h_input(esp_hidh_dev_t *dev, uint8_t  *data, uint16_t length);
-void    blue_h_close(esp_hidh_event_data_t *p);
-void    blue_h_open(esp_hidh_event_data_t *p);
-void    blue_scan(void *pvParameters);
+uint8_t blue_get_pin_code(esp_bd_addr_t bda, esp_bt_pin_code_t pin);
+void	blue_h_boot(uint8_t  *data, uint16_t length);
+void	blue_h_input(esp_hidh_dev_t *dev, uint16_t id, uint8_t  *data, uint16_t length);
+void blue_h_close(esp_hidh_event_data_t *p);
+void blue_h_open(esp_hidh_event_data_t *p);
+void blue_scan(void *pvParameters);
 void	blue_set_boot_protocol(esp_hidh_dev_t *dev);
 
 /* global variables for tasks handles */

@@ -29,6 +29,7 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_chip_info.h"
+#include "esp_gap_bt_api.h"
 
 #include "adb.h"
 #include "blue.h"

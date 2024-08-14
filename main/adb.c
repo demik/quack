@@ -3,7 +3,7 @@
  *  quack
  *
  *  Created by Michel DEPEIGE on 7/01/2020.
- *  Copyright (c) 2020 Michel DEPEIGE.
+ *  Copyright (c) 2020-2024 Michel DEPEIGE.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Apache License, Version 2.0 (the "License");

@@ -41,6 +41,7 @@
 #endif
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
+#include "esp_gap_bt_api.h"
 #include "esp_timer.h"
 
 #include "esp_hid_common.h"
@@ -53,6 +54,7 @@
 #include "gpio.h"
 #include "led.h"
 #include "m4848.h"
+#include "wii.h"
 
 /* debug tag */
 static const char *TAG = "blue";
@@ -230,158 +232,36 @@ void	blue_adb2hid(void *pvParameters) {
 	}
 }
 
-/* Host specific functions blue_h_* */
-void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
-{
-	esp_hidh_event_t event = (esp_hidh_event_t)id;
-	esp_hidh_event_data_t *param = (esp_hidh_event_data_t *)event_data;
-
-	const uint8_t *bda = NULL;
-
-	/* union described in include/esp_hidh.h */
-	switch (event) {
-		case ESP_HIDH_OPEN_EVENT: {
-			esp_hidh_dev_dump(param->open.dev, stdout);
-			blue_h_open(param);
-			break;
-		}
-		case ESP_HIDH_BATTERY_EVENT: {
-			bda = esp_hidh_dev_bda_get(param->battery.dev);
-			ESP_LOGI(TAG, ESP_BD_ADDR_STR " battery: %d%%", ESP_BD_ADDR_HEX(bda), param->battery.level);
-			break;
-		}
-		case ESP_HIDH_INPUT_EVENT: {
-			//ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
-			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
-			blue_h_input(param->input.dev, param->input.data, param->input.length);
-			break;
-					   }
-		case ESP_HIDH_FEATURE_EVENT: {
-			bda = esp_hidh_dev_bda_get(param->feature.dev);
-							 ESP_LOGI(TAG, ESP_BD_ADDR_STR " FEATURE: %8s, MAP: %2u, ID: %3u, Len: %d", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->feature.usage), param->feature.map_index, param->feature.report_id, param->feature.length);
-							 ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
-							 break;
-						 }
-		case ESP_HIDH_CLOSE_EVENT: {
-			blue_h_close(param);
-			break;
-		}
-		default:
-			ESP_LOGI(TAG, "Unknwown event: %d", event);
-	}
-}
-
-void blue_h_close(esp_hidh_event_data_t *p) {
-	const uint8_t *bda = NULL;
-
-	configASSERT(p != NULL);
-	bda = esp_hidh_dev_bda_get(p->close.dev);
-	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
-	esp_hidh_dev_free(p->close.dev);
-
-	blue_pointers--;
-	if (! blue_pointers)
-		xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
-}
-
-static void	blue_handle_button(uint8_t buttons) {
-	static bool	locked = false;
-	static bool	releasable = true;
-	static bool	status = BLUE_BUTTON_N;	// Keep state
-
-	buttons = buttons & (BLUE_BUTTON_1 | BLUE_BUTTON_2 | BLUE_BUTTON_3);
-
-	if (status && buttons)
-		return ;
-	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N && !locked)
-		return ;
-	if (buttons == BLUE_BUTTON_2 && locked && !releasable)
-		return ;
-	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N && locked) {
-		releasable = true;
-		return ;
-	}
-
-	/* release button */
-	if (status && buttons == BLUE_BUTTON_N && !locked) {
-		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
-		status = 0;
-		ESP_LOGD(TAG, "button released");
-		return ;
-	}
-
-	/* stick button on right click */
-	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_2 && !locked) {
-		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
-		locked = true;
-		releasable = false;
-		ESP_LOGD(TAG, "button locked");
-		return ;
-	}
-
-	/* press button (simple click) */
-	if (status == BLUE_BUTTON_N && buttons) {
-		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
-		locked = false;
-		status = 1;
-		ESP_LOGD(TAG, "button pressed");
-		return ;
-	}
-}
-
-static void blue_h_init(void) {
-	esp_hidh_config_t config = {
-		.callback = blue_h_callback,
-		.event_stack_size = 4096
-	};
-
-	ESP_ERROR_CHECK(esp_hidh_init(&config));
-
-	blue_pointers = 0;
-	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
-}
-
 /*
- * Bluetooth common init: init module and various stuff
- * Host or Device specific inits go in blue_d_init() or blue_h_init()
+ * this function try to guess wich pin code to use when asked for one
+ * it just harass the different drivers and get a pin code from the driver
  */
-void blue_init(void)
+uint8_t blue_get_pin_code(esp_bd_addr_t bda, esp_bt_pin_code_t pin)
 {
-	esp_err_t	ret;
-
-	ret = nvs_flash_init();
-	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-		ESP_ERROR_CHECK(nvs_flash_erase());
-		ret = nvs_flash_init();
+	if (wii_is_nintendo_bda(bda)) {
+		wii_generate_pin(pin);
+		ESP_LOGD(TAG, "Nintendo device asking for pin, trying with pin " WII_PIN_STR,
+			    WII_PIN_HEX(pin));
+		return 6;
 	}
 
-	ESP_LOGD(TAG, "Starting Bluetooth init on core %d", xPortGetCoreID());
-	ESP_ERROR_CHECK(ret);
-	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_CLASSIC_BT));
+	/* let's try with default pin */
+	ESP_LOGI(TAG, "no match found, trying with default pin code: 1234");
+	pin[0] = '1';
+	pin[0] = '2';
+	pin[0] = '3';
+	pin[0] = '4';
 
-	esp_log_level_set("event", ESP_LOG_INFO);
-	/* complains about wrong data len on BOOT mode and CCONTROL */
-	esp_log_level_set("BT_HIDH", ESP_LOG_ERROR);
-
-	/*
-	 * at this point, everything but bluetooth is started.
-	 * put green steady, start blinking blue and keep scanning until a device is found
-	 *
-	 * starting IDF 5.2.2, sometimes the first xTaskNotify() call may be lost. why ?
-	 */
-
-	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
-	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
-	xTaskNotify(t_blue, LED_FAST, eSetValueWithOverwrite);
-
-	if (adb_is_host())
-		blue_d_init();
-	else
-		blue_h_init();
+	return 4;
 }
 
+/************************************
+ * Host specific functions blue_h_* *
+ ************************************/
+
 /*
- * data follows HID Mouse boot protocol format
+ * this function will decode a boot protocol frame and convert it for quadrature tasks
+ * data arg follows HID Mouse boot protocol format
  *
  * Byte | Bits | Description
  * -----+------+---------------------------------------------------------------
@@ -394,12 +274,11 @@ void blue_init(void)
  * 3+   | 0-7  | Device specific, usually 3 is scroll wheel, usually unused (0)
  */
 
-void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
+void blue_h_boot(uint8_t *data, uint16_t length) {
 	uint8_t buttons;
 	uint8_t	i;
 	int8_t x, y;
 
-	//ESP_LOG_BUFFER_HEX(TAG, data, length);
 	buttons = data[0];
 
 	/*
@@ -486,19 +365,198 @@ void blue_h_input(esp_hidh_dev_t *dev, uint8_t *data, uint16_t length) {
 	}
 }
 
-void blue_h_open(esp_hidh_event_data_t *p) {
+void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+{
+	esp_hidh_event_t event = (esp_hidh_event_t)id;
+	esp_hidh_event_data_t *param = (esp_hidh_event_data_t *)event_data;
+
+	const uint8_t *bda = NULL;
+
+	/* union described in include/esp_hidh.h */
+	switch (event) {
+		case ESP_HIDH_OPEN_EVENT: {
+			esp_hidh_dev_dump(param->open.dev, stdout);
+			blue_h_open(param);
+			break;
+		}
+		case ESP_HIDH_BATTERY_EVENT: {
+			bda = esp_hidh_dev_bda_get(param->battery.dev);
+			ESP_LOGI(TAG, ESP_BD_ADDR_STR " battery: %d%%", ESP_BD_ADDR_HEX(bda), param->battery.level);
+			break;
+		}
+		case ESP_HIDH_INPUT_EVENT: {
+			//ESP_LOG_BUFFER_HEX(TAG, param->input.data, param->input.length);
+			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
+			blue_h_input(param->input.dev, param->input.report_id, param->input.data, param->input.length);
+			break;
+					   }
+		case ESP_HIDH_FEATURE_EVENT: {
+			bda = esp_hidh_dev_bda_get(param->feature.dev);
+							 ESP_LOGI(TAG, ESP_BD_ADDR_STR " FEATURE: %8s, MAP: %2u, ID: %3u, Len: %d", ESP_BD_ADDR_HEX(bda), esp_hid_usage_str(param->feature.usage), param->feature.map_index, param->feature.report_id, param->feature.length);
+							 ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
+							 break;
+						 }
+		case ESP_HIDH_CLOSE_EVENT: {
+			blue_h_close(param);
+			break;
+		}
+		default:
+			ESP_LOGI(TAG, "Unknwown event: %d", event);
+	}
+}
+
+void blue_h_close(esp_hidh_event_data_t *p) {
 	const uint8_t *bda = NULL;
 
 	configASSERT(p != NULL);
+	bda = esp_hidh_dev_bda_get(p->close.dev);
+	ESP_LOGI(TAG, "closed connection with device " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
+	esp_hidh_dev_free(p->close.dev);
+
+	blue_pointers--;
+	if (! blue_pointers)
+		xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
+}
+
+/*
+ * this function dispatch the input message to the correct driver
+ * the detection is based on Product ID + Vendor ID lists that each driver provides
+ * if no specific driver claims that combinaison, try with the generic boot driver
+ */
+void blue_h_input(esp_hidh_dev_t *dev, uint16_t id, uint8_t *data, uint16_t length) {
+     uint16_t vid = esp_hidh_dev_vendor_id_get(dev);
+     uint16_t pid = esp_hidh_dev_product_id_get(dev);
+
+	if (wii_is_wiimote(vid, pid)) {
+		wii_input(dev, id, data, length);
+		return;
+	}
+
+	blue_h_boot(data, length);
+}
+
+static void blue_h_init(void) {
+	esp_hidh_config_t config = {
+		.callback = blue_h_callback,
+		.event_stack_size = 4096
+	};
+
+	ESP_ERROR_CHECK(esp_hidh_init(&config));
+
+	blue_pointers = 0;
+	xTaskCreatePinnedToCore(blue_scan, "blue_scan", 6 * 1024, NULL, 2, NULL, 0);
+
+	/* bluetooth stack ready at this point, initialise wii stuff there */
+	wii_init();
+}
+
+static void	blue_handle_button(uint8_t buttons) {
+	static bool	locked = false;
+	static bool	releasable = true;
+	static bool	status = BLUE_BUTTON_N;	// Keep state
+
+	buttons = buttons & (BLUE_BUTTON_1 | BLUE_BUTTON_2 | BLUE_BUTTON_3);
+
+	if (status && buttons)
+		return ;
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N && !locked)
+		return ;
+	if (buttons == BLUE_BUTTON_2 && locked && !releasable)
+		return ;
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_N && locked) {
+		releasable = true;
+		return ;
+	}
+
+	/* release button */
+	if (status && buttons == BLUE_BUTTON_N && !locked) {
+		xTaskNotify(t_click, 0, eSetValueWithOverwrite);
+		status = 0;
+		ESP_LOGD(TAG, "button released");
+		return ;
+	}
+
+	/* stick button on right click */
+	if (status == BLUE_BUTTON_N && buttons == BLUE_BUTTON_2 && !locked) {
+		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
+		locked = true;
+		releasable = false;
+		ESP_LOGD(TAG, "button locked");
+		return ;
+	}
+
+	/* press button (simple click) */
+	if (status == BLUE_BUTTON_N && buttons) {
+		xTaskNotify(t_click, 1, eSetValueWithOverwrite);
+		locked = false;
+		status = 1;
+		ESP_LOGD(TAG, "button pressed");
+		return ;
+	}
+}
+
+/*
+ * Bluetooth common init: init module and various stuff
+ * Host or Device specific inits go in blue_d_init() or blue_h_init()
+ */
+void blue_init(void)
+{
+	esp_err_t	ret;
+
+	ret = nvs_flash_init();
+	if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+		ESP_ERROR_CHECK(nvs_flash_erase());
+		ret = nvs_flash_init();
+	}
+
+	ESP_LOGD(TAG, "Starting Bluetooth init on core %d", xPortGetCoreID());
+	ESP_ERROR_CHECK(ret);
+	ESP_ERROR_CHECK(esp_hid_gap_init(ESP_BT_MODE_CLASSIC_BT));
+
+	esp_log_level_set("event", ESP_LOG_INFO);
+	/* complains about wrong data len on BOOT mode and CCONTROL */
+	esp_log_level_set("BT_HIDH", ESP_LOG_VERBOSE);
+
+	/*
+	 * at this point, everything but bluetooth is started.
+	 * put green steady, start blinking blue and keep scanning until a device is found
+	 *
+	 * starting IDF 5.2.2, sometimes the first xTaskNotify() call may be lost. why ?
+	 */
+
+	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+	xTaskNotify(t_green, LED_ON, eSetValueWithOverwrite);
+	xTaskNotify(t_blue, LED_FAST, eSetValueWithOverwrite);
+
+	if (adb_is_host())
+		blue_d_init();
+	else
+		blue_h_init();
+}
+
+void blue_h_open(esp_hidh_event_data_t *p) {
+	const uint8_t *bda = NULL;
+	bool	generic = true;
+
+	configASSERT(p != NULL);
+	uint16_t vid = esp_hidh_dev_vendor_id_get(p->open.dev);
+     uint16_t pid = esp_hidh_dev_product_id_get(p->open.dev);
 	bda = esp_hidh_dev_bda_get(p->open.dev);
 	ESP_LOGI(TAG, "opened connection with " ESP_BD_ADDR_STR, ESP_BD_ADDR_HEX(bda));
 
-	/* Dump various info on console */
-	blue_hid_rm_get(p->open.dev);
-	blue_set_boot_protocol(p->open.dev);
-	if (blue_support_boot(p->open.dev) == false) {
-		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
-		ESP_LOGE(TAG, "Mouse does not support boot protocol !");
+	if (wii_is_wiimote(vid, pid)) {
+		wii_open(bda);
+		generic = false;
+	}
+
+	/* Dump various info on console for generic devices */
+	if (generic) {
+		blue_hid_rm_get(p->open.dev);
+		blue_set_boot_protocol(p->open.dev);
+		if (blue_support_boot(p->open.dev) == false) {
+			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+			ESP_LOGE(TAG, "Mouse does not support boot protocol !");
+		}
 	}
 
 	blue_pointers++;
@@ -520,7 +578,7 @@ static esp_hid_report_item_t blue_h_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u
 	memset(&search, 0, sizeof(esp_hid_report_item_t));
 
 	for (uint8_t i = 0; i < num_reports; i++) {
-		if (reports[i].protocol_mode == p && reports[i].report_type == t &&	reports[i].usage == u) {
+		if (reports[i].protocol_mode == p && reports[i].report_type == t && reports[i].usage == u) {
 			memcpy(&search, &reports[i], sizeof(esp_hid_report_item_t));
 			break;
 		}
@@ -562,49 +620,61 @@ static esp_hid_raw_report_map_t *blue_hid_rm_get(esp_hidh_dev_t *dev) {
 }
 
 void blue_scan(void *pvParameters) {
-    size_t len = 0;
-    esp_hid_scan_result_t *mouse = NULL;
-    esp_hid_scan_result_t *results = NULL;
+	size_t len = 0;
+	esp_hid_scan_result_t *mouse = NULL;
+	esp_hid_scan_result_t *results = NULL;
+	esp_hid_scan_result_t *wii = NULL;
 
-    ESP_LOGI(TAG, "starting scan on core %d…", xPortGetCoreID());
-    esp_hid_scan(BLUE_SCAN_DURATION, &len, &results);
-    ESP_LOGI(TAG, "scan returned %u result(s)", len);
+	ESP_LOGI(TAG, "starting scan on core %d…", xPortGetCoreID());
+	esp_hid_scan(BLUE_SCAN_DURATION, &len, &results);
+	ESP_LOGI(TAG, "scan returned %u result(s)", len);
 
 	/* don't put the slow blink is a device reconnected while scanning */
 	if (blue_pointers == 0)
 		xTaskNotify(t_blue, LED_SLOW, eSetValueWithOverwrite);
 
-    if (len) {
-        esp_hid_scan_result_t *r = results;
+	if (len) {
+		esp_hid_scan_result_t *r = results;
 
-        while (r) {
-			/*
-			 * as of v1.4.5, esp_hid_gap will print detected devices in console (handle_bt_device_result())
-			 * just look for something that looks like Bluetooth Classic mouse
-			 */
+		/*
+		 * as of v1.4.5, esp_hid_gap will print detected devices in console (handle_bt_device_result())
+		 * just look for bluetooth classic devices that may be supported
+		 */
+		while (r) {
+			if (r->transport == ESP_HID_TRANSPORT_BT &&
+			    strcmp("PERIPHERAL", esp_hid_cod_major_str(r->bt.cod.major)) == 0) {
 
-            if (r->transport == ESP_HID_TRANSPORT_BT &&
-				strcmp("PERIPHERAL", esp_hid_cod_major_str(r->bt.cod.major)) == 0
-				&& (r->bt.cod.minor & ESP_HID_COD_MIN_MOUSE)) {
-                    mouse = r;
-            }
-            r = r->next;
-        }
+				/* look for something that look like a mouse… */
+				if (r->bt.cod.minor & ESP_HID_COD_MIN_MOUSE)
+					mouse = r;
 
-        /* try to connect to the last candidate found */
-        if (mouse)
+				/* … or a wiimote (COD minor 1 is JOYSTICK) */
+				if (r->bt.cod.minor == 1 && wii_is_nintendo_bda(r->bda))
+					wii = r;
+			}
+			r = r->next;
+		}
+	}
+
+	/* try to connect to the last candidate found */
+	if (mouse)
 #if CONFIG_BT_BLE_ENABLED
-            esp_hidh_dev_open(mouse->bda, mouse->transport, mouse->ble.addr_type);
+		esp_hidh_dev_open(mouse->bda, mouse->transport, mouse->ble.addr_type);
 #else
-            esp_hidh_dev_open(mouse->bda, mouse->transport, NULL);
+		esp_hidh_dev_open(mouse->bda, mouse->transport, 0);
 #endif
-        else
-            ESP_LOGI(TAG, "devices found but no mouse detected");
+	if (wii)
+		esp_hidh_dev_open(wii->bda, wii->transport, 0);
 
-        esp_hid_scan_results_free(results);
-    }
+	if (len && (!mouse && !wii)) {
+		ESP_LOGI(TAG, "%i devices found, but no mouse or wiimote detected", len);
+		esp_hid_scan_results_free(results);
+	}
+	if (len == 0) {
+		ESP_LOGI(TAG, "no new mouse or wiimote detected");
+	}
 
-    vTaskDelete(NULL);
+	vTaskDelete(NULL);
 }
 
 void blue_set_boot_protocol(esp_hidh_dev_t *dev) {

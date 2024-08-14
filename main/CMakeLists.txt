@@ -4,8 +4,9 @@ set(srcs "adb.c"
 	 "gpio.c"
 	 "led.c"
 	 "main.c"
-	 "quad.c")
-         
+	 "quad.c"
+	 "wii.c")
+
 set(include_dirs ".")
 
 idf_component_register(SRCS "${srcs}"
