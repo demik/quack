@@ -18,3 +18,4 @@ List of relevant files:
 - m4848.h Header for Apple Hockey Puck mouse over Bluetooth emulation
 - main.c Everything start here
 - quad.c Quadrature related functions (mouse port)
+- wii.* Wiimote driver

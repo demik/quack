@@ -1,5 +1,9 @@
 ## v1.4.8
 - added support for MacAlly Joystick
+- added support for Wiimotes
+	- D-pad movement working, click on B, half-click on A
+	- selectable movement speed on the Weemote + LED feedback
+	- this lay the framework to add drivers for some unsupported devices
 
 ## v1.4.7
 - new feature: half click on right BT click (similar to some ADB devices)
