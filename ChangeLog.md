@@ -1,6 +1,11 @@
+## v1.4.9 (pre)
+- added basic support for some PDP Rock Candy Wiimotes
+	- BDAs starting from the range 08:03:64
+	- remote doesn't reconnect correctly, have to repair each time
+
 ## v1.4.8
 - added support for MacAlly Joystick
-- added support for Wiimotes
+- added support for Nintendo Wiimotes
 	- D-pad movement working, click on B, half-click on A
 	- selectable movement speed on the Weemote + LED feedback
 	- this lay the framework to add drivers for some unsupported devices
