@@ -91,7 +91,7 @@ patching file 'src/ir_input.h'
 patching file 'src/nintendo.h'
 ```
 
-To avoid [this issue](https://github.com/rossumur/esp_8_bit/issues/19) you may want to change the partition layout as well. Check the solution into that issue, and also the boards.txt and quack_8_bit.csv if needed
+To avoid [this issue](https://github.com/rossumur/esp_8_bit/issues/19) you may want to change the partition layout as well. Check the solution into that issue, and also the boards.txt and quack_8_bit.csv files if needed
 
 ###
 
