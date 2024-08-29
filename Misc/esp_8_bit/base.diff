@@ -1,0 +1,875 @@
+diff --git a/README.md b/README.md
+index c548654..7d33f55 100644
+--- a/README.md
++++ b/README.md
+@@ -1,29 +1,59 @@
+ # **ESP_8_BIT:** Atari 8 bit computers, NES and SMS game consoles on your TV with nothing more than a ESP32 and a sense of nostalgia
+-## Supports NTSC/PAL color composite video output, Bluetooth Classic or IR keyboards and joysticks; just the thing when we could all use a little distraction
++## Supports NTSC/PAL color composite video output, Bluetooth Classic keyboards and joysticks; just the thing when we could all use a little distraction
++## Supports classic NES (or SNES) controller hardwired to the ESP32. SELECT + LEFT to access file menu. SELECT + START -> reset
+ 
+ ![ESP_8_BIT](img/esp8bit.jpg)
+ 
+-**ESP_8_BIT** is designed to run on the ESP32 within the Arduino IDE framework. See it in action on [Youtube](https://www.youtube.com/watch?v=qFRkfeuTUrU). Schematic is pretty simple:
++**ESP_8_BIT** is designed to run on the ESP32 within the Arduino IDE framework. See it in action on [Youtube](https://www.youtube.com/watch?v=qFRkfeuTUrU). Schematic is simple, including LVC buffers (3.3 to 5V and vice versa):
+ 
+ ```
+     -----------
+     |         |
+-    |      25 |------------------> video out
++    |      25 |----------------------------------> video out
+     |         |
+-    |      18 |---/\/\/\/----|---> audio out
+-    |         |     1k       |
+-    |         |             ---
+-    |  ESP32  |             --- 10nf
+-    |         |              |
+-    |         |              v gnd
++    |         |   ------------
++    |       2 |---| LVC 4245 |----/\/\/\/----|---> audio out
++    |         |   ------------      1kΩ      |
++    |         |                             ---
++    |         |                             --- 10nF
++    |  ESP32  |                              |
++    |         |                              v gnd
++    |         |
++    |         |   ------------
++    |       4 |---| LVC 2T45 |---< NES (or SNES) controller DATA
++    |         |   ------------
++    |         |   ------------
++    |      12 |---| LVC 4245 |---> NES (or SNES) controller CLOCK
++    |      14 |---| LVC 4245 |---> NES (or SNES) controller LATCH
++    |         |   ------------
++    |         |            5v <--> NES (or SNES) controller VCC
++    |         |           gnd <--> NES (or SNES) controller GND
+     |         |
+-    |         |     3.3v <--+-+   IR Receiver
+-    |         |      gnd <--|  )  TSOP4838 etc.
+-    |       0 |-------------+-+   (Optional)
+     -----------
+ 
++
++NES        ___
++    DATA  |o o| NC
++    LATCH |o o| NC
++    CLOCK |o o/ 5V
++    GND   |o_/
++
++SNES       _
++    5V    |o|
++    CLOCK |o|
++    LATCH |o|
++    DATA  |o|
++          |-|
++    NC    |o|
++    NC    |o|
++    GND   |o|
++           -
++
+ ```
+-Audio is on pin 18 by default but can be remapped.
++Audio is on pin 2 for Quack compatibility
++
++Enable either NES or SNES controller with
++#define NES_CONTROLLER or #define SNES_CONTROLLER (not both) in nintendo.h file
+ 
+ Before you compile the sketch you have 2 choices:
+ ```
+@@ -181,7 +211,7 @@ You will want to add a simple rc filter to the output pin of either PWM or PDM t
+ 
+ ## Bringing it Together
+ 
+-The audio/video system uses a double buffered I2S DMA to send video data line by line to the DAC. The interrupt keeps time at the line rate (15720hz for NTSC, 15600hz for PAL). A single audio sample is fed to the LED PWM and a single line of video is converted from index color to phase/amplitude at each interrupt. The IR input pin is scanned and the various IR state machines advanced on changes.
++The audio/video system uses a double buffered I2S DMA to send video data line by line to the DAC. The interrupt keeps time at the line rate (15720hz for NTSC, 15600hz for PAL). A single audio sample is fed to the LED PWM and a single line of video is converted from index color to phase/amplitude at each interrupt. The hard wired input pin is scanned as well
+ 
+ This a/v pump is fed by the emulator running asynchronously producing frames of video and audio. The emulator may be running on a different core and may occasionally take longer than a frame time to produce a frame (SPI paging / FS etc). The interrupt driven pump won't care, it just keeps emitting the last frame.
+ 
+@@ -195,18 +225,16 @@ How do you fit a 512k game cartridge into a device that has 384k of RAM, nearly
+ 
+ Short answer is you don't. When a large cart is selected it gets copied into `CrapFS`; an aptly named simple filesystem that takes over the `app1` partition at first boot. One copied `CrapFS` uses `esp_partition_mmap()` to map the part of the partition occupied by the cartridge into the data space of the CPU.
+ 
+-> We are using an Audio PLL to create color composite video and a LED PWM peripheral to make the audio, a Bluetooth radio or a single GPIO pin for the joysticks and keyboard, and gpio for the IR even though there is a perfectly good peripheral for that. We are using virtual memory on a microcontroller. And it all fits on a single core. Oh how I love the ESP32.
++> We are using an Audio PLL to create color composite video and a LED PWM peripheral to make the audio, a Bluetooth radio or a single GPIO pin for the joysticks and keyboard, and gpio for the classic controller. We are using virtual memory on a microcontroller. And it all fits on a single core. Oh how I love the ESP32.
+ 
+ 
+ # Keyboards & Controllers
+-**ESP_8_BIT** supports Bluetooth Classic/EDR keyboards and WiiMotes along with an variety of IR keyboards and joysticks.
++**ESP_8_BIT** supports Bluetooth Classic/EDR keyboards and WiiMotes along with either a classic NES or SNES controller
+ 
+ **On boot the software searches for new Bluetooth devices for 5 seconds**; if the device is in pairing mode the software should find it and display its name at the bottom of the screen. Some keyboards will require you to enter a "0000" to establish the connection the first time. WiiMotes should automatically pair and reconnect. WiiMote Classic controllers are also supported.
+ 
+ ![Input Devices](img/inputdevices.jpg)
+ 
+-A number of IR input devices are supported if to add a optional IR receiver (TSOP38238, TSOP4838 or equivalent) to pin 0. The IR Wireless Controllers from Atari Flashback 4 work well and have that classic Atari joystick feel. Retron IR controllers are supported as are WebTV keyboards that come in various guises: WebTV, MsnTV, Displayer, UltimateTV etc. They all should work just fine. A few places have the nice Philips variant new for $11.95 w/ free shipping (search for 'SWK-8630'). If you made a [ZorkDuino](https://hackaday.com/2014/04/30/the-zorkduino/) you will have one of these.
+-
+ # Time to Play
+ 
+ If you would like to upload your own media copy them into the appropriate subfolder named for each of the emulators in the data folder. Note that the SPIFFS filesystem is fussy about filenames, keep them short, no spaces allowed. Use '[ESP32 Sketch Data Upload](https://randomnerdtutorials.com/install-esp32-filesystem-uploader-arduino-ide/)' from the 'Tools' menu to copy a prepared data folder to ESP32.
+diff --git a/data/atari800/atari_robot.xex b/data/atari800/atari_robot.xex
+deleted file mode 100644
+index b27fb91..0000000
+Binary files a/data/atari800/atari_robot.xex and /dev/null differ
+diff --git a/data/atari800/balls_forever.xex b/data/atari800/balls_forever.xex
+deleted file mode 100644
+index 7b414a0..0000000
+Binary files a/data/atari800/balls_forever.xex and /dev/null differ
+diff --git a/data/atari800/boink.xex b/data/atari800/boink.xex
+deleted file mode 100644
+index 3bad906..0000000
+Binary files a/data/atari800/boink.xex and /dev/null differ
+diff --git a/data/atari800/callisto.xex b/data/atari800/callisto.xex
+deleted file mode 100644
+index f6b42e1..0000000
+Binary files a/data/atari800/callisto.xex and /dev/null differ
+diff --git a/data/atari800/dos20.atr b/data/atari800/dos20.atr
+deleted file mode 100644
+index 2685d6d..0000000
+Binary files a/data/atari800/dos20.atr and /dev/null differ
+diff --git a/data/atari800/gravity_worms.atr b/data/atari800/gravity_worms.atr
+deleted file mode 100755
+index 645ca33..0000000
+Binary files a/data/atari800/gravity_worms.atr and /dev/null differ
+diff --git a/data/atari800/gtia_blast.xex b/data/atari800/gtia_blast.xex
+deleted file mode 100644
+index 964f0d6..0000000
+Binary files a/data/atari800/gtia_blast.xex and /dev/null differ
+diff --git a/data/atari800/janes_program.xex b/data/atari800/janes_program.xex
+deleted file mode 100644
+index 4fbbc12..0000000
+Binary files a/data/atari800/janes_program.xex and /dev/null differ
+diff --git a/data/atari800/maze.xex b/data/atari800/maze.xex
+deleted file mode 100755
+index 265191c..0000000
+Binary files a/data/atari800/maze.xex and /dev/null differ
+diff --git a/data/atari800/mini_zork.atr b/data/atari800/mini_zork.atr
+deleted file mode 100644
+index ed29c1a..0000000
+Binary files a/data/atari800/mini_zork.atr and /dev/null differ
+diff --git a/data/atari800/more.xex b/data/atari800/more.xex
+deleted file mode 100644
+index 835b1ca..0000000
+Binary files a/data/atari800/more.xex and /dev/null differ
+diff --git a/data/atari800/numen_rubik.atr b/data/atari800/numen_rubik.atr
+deleted file mode 100644
+index c198cdf..0000000
+Binary files a/data/atari800/numen_rubik.atr and /dev/null differ
+diff --git a/data/atari800/paperweight.xex b/data/atari800/paperweight.xex
+deleted file mode 100644
+index fbd30c1..0000000
+Binary files a/data/atari800/paperweight.xex and /dev/null differ
+diff --git a/data/atari800/raymaze_2000_ntsc.xex b/data/atari800/raymaze_2000_ntsc.xex
+deleted file mode 100755
+index 5d8f45f..0000000
+Binary files a/data/atari800/raymaze_2000_ntsc.xex and /dev/null differ
+diff --git a/data/atari800/runner_bear.xex b/data/atari800/runner_bear.xex
+deleted file mode 100644
+index 3fb35b3..0000000
+Binary files a/data/atari800/runner_bear.xex and /dev/null differ
+diff --git a/data/atari800/star_raiders_II.atr b/data/atari800/star_raiders_II.atr
+deleted file mode 100644
+index 05ba6a7..0000000
+Binary files a/data/atari800/star_raiders_II.atr and /dev/null differ
+diff --git a/data/atari800/wasteland.atr b/data/atari800/wasteland.atr
+deleted file mode 100755
+index 533b441..0000000
+Binary files a/data/atari800/wasteland.atr and /dev/null differ
+diff --git a/data/atari800/yoomp_nt.xex b/data/atari800/yoomp_nt.xex
+deleted file mode 100644
+index 3b20897..0000000
+Binary files a/data/atari800/yoomp_nt.xex and /dev/null differ
+diff --git a/data/nofrendo/sokoban.nes b/data/nofrendo/sokoban.nes
+deleted file mode 100755
+index 4628512..0000000
+Binary files a/data/nofrendo/sokoban.nes and /dev/null differ
+diff --git a/data/nofrendo/tokumaru_raycast.nes b/data/nofrendo/tokumaru_raycast.nes
+deleted file mode 100644
+index 7e7f9fc..0000000
+Binary files a/data/nofrendo/tokumaru_raycast.nes and /dev/null differ
+diff --git a/data/smsplus/baraburuu.sms b/data/smsplus/baraburuu.sms
+deleted file mode 100755
+index 2683e0f..0000000
+Binary files a/data/smsplus/baraburuu.sms and /dev/null differ
+diff --git a/data/smsplus/ftrack.gg b/data/smsplus/ftrack.gg
+deleted file mode 100644
+index e58a12f..0000000
+Binary files a/data/smsplus/ftrack.gg and /dev/null differ
+diff --git a/data/smsplus/nanowars8k.sms b/data/smsplus/nanowars8k.sms
+deleted file mode 100644
+index 7d7c38a..0000000
+Binary files a/data/smsplus/nanowars8k.sms and /dev/null differ
+diff --git a/esp_8_bit.ino b/esp_8_bit.ino
+index 2256665..fa45f80 100644
+--- a/esp_8_bit.ino
++++ b/esp_8_bit.ino
+@@ -18,7 +18,8 @@
+ #include "esp_int_wdt.h"
+ #include "esp_spiffs.h"
+ 
+-#define PERF  // some stats about where we spend our time
++#include "soc/efuse_reg.h"
++#undef PERF  // some stats about where we spend our time
+ #include "src/emu.h"
+ #include "src/video_out.h"
+ 
+@@ -27,10 +28,10 @@
+ // Supports NTSC/PAL composite video, Bluetooth Classic keyboards and joysticks
+ 
+ //  Choose one of the video standards: PAL,NTSC
+-#define VIDEO_STANDARD NTSC
++#define VIDEO_STANDARD PAL
+ 
+ //  Choose one of the following emulators: EMU_NES,EMU_SMS,EMU_ATARI
+-#define EMULATOR EMU_ATARI
++#define EMULATOR EMU_NES
+ 
+ //  Many emus work fine on a single core (S2), file system access can cause a little flickering
+ //  #define SINGLE_CORE
+@@ -42,9 +43,29 @@
+ // Folders will be auto-populated on first launch with a built in selection of sample media.
+ // Use 'ESP32 Sketch Data Upload' from the 'Tools' menu to copy a prepared data folder to ESP32
+ 
++// Quack hardware DIP switch block
++// on ESP32-PICO-D4, the following pins are used for connecting the
++// embedded flash:
++// - CLK (GPIO6)
++// - SD0 (GPIO7)
++// - SD1 (GPIO8)
++// - CMD (GPIO11)
++// - GPIO16
++// - GPIO17
++#include "driver/gpio.h"
++#define GPIO_ADB      4   // Used for NES or SNES classic controller data line
++#define GPIO_DIR      19  // Select data in or out
++#define GPIO_OE			  22  // Enable 3.3V to 5V buffer
++#define GPIO_ADBSRC		32  // USed to select classic controller player A (0, pulled down) or B (1)
++#define GPIO_BTOFF		33  // Used to disable bluetooth
++#define GPIO_GREENLED	21
++#undef GPIO_BLUELED      25  // Has to be desoldered, and resistor R1 bridged (video out)
++#define GPIO_YELLOWLED	26
++#define GPIO_REDLED		27
++
+ // Create a new emulator, messy ifdefs ensure that only one links at a time
+ Emu* NewEmulator()
+-{  
++{
+   #if (EMULATOR==EMU_NES)
+   return NewNofrendo(VIDEO_STANDARD);
+   #endif
+@@ -88,13 +109,16 @@ void emu_task(void* arg)
+     printf("emu_task %s running on core %d at %dmhz\n",
+       _emu->name.c_str(),xPortGetCoreID(),rtc_clk_cpu_freq_value(rtc_clk_cpu_freq_get()));
+     emu_init();
++
++    /* Quack: enable green led after init */
++    gpio_set_level((gpio_num_t)GPIO_GREENLED, 1);
+     for (;;)
+       emu_loop();
+ }
+ 
+ esp_err_t mount_filesystem()
+ {
+-  printf("\n\n\nesp_8_bit\n\nmounting spiffs (will take ~15 seconds if formatting for the first time)....\n");
++  printf("\n\n\nesp_8_bit on Quack\n\nmounting spiffs (will take ~15 seconds if formatting for the first time)....\n");
+   uint32_t t = millis();
+   esp_vfs_spiffs_conf_t conf = {
+     .base_path = "",
+@@ -111,11 +135,49 @@ esp_err_t mount_filesystem()
+ }
+ 
+ void setup()
+-{ 
+-  rtc_clk_cpu_freq_set(RTC_CPU_FREQ_240M);  
++{
++  // from CornN64 commit 4e2e5d2
++  int silicon_version = (REG_READ(EFUSE_BLK0_RDATA3_REG) >> 15) & 1;
++  if (silicon_version == 0)
++    printf("Warning this revision of the chip has an issue with the APLL and will not work properly!\n");
++
++  // setup Quack buffer, GPIOs and LEDs here
++  gpio_reset_pin((gpio_num_t)GPIO_ADBSRC);
++  gpio_set_direction((gpio_num_t)GPIO_ADBSRC, GPIO_MODE_INPUT);
++  gpio_reset_pin((gpio_num_t)GPIO_BTOFF);
++  gpio_set_direction((gpio_num_t)GPIO_BTOFF, GPIO_MODE_INPUT);
++  gpio_reset_pin((gpio_num_t)GPIO_DIR);
++  gpio_reset_pin((gpio_num_t)GPIO_OE);
++  gpio_set_direction((gpio_num_t)GPIO_DIR, GPIO_MODE_OUTPUT);
++  gpio_set_direction((gpio_num_t)GPIO_OE, GPIO_MODE_OUTPUT);
++  gpio_set_direction((gpio_num_t)GPIO_ADB, GPIO_MODE_INPUT);
++  gpio_set_level((gpio_num_t)GPIO_DIR, 0);
++  gpio_reset_pin((gpio_num_t)GPIO_GREENLED);
++  gpio_reset_pin((gpio_num_t)GPIO_YELLOWLED);
++  gpio_reset_pin((gpio_num_t)GPIO_REDLED);
++  gpio_set_direction((gpio_num_t)GPIO_GREENLED, GPIO_MODE_OUTPUT);
++  gpio_set_direction((gpio_num_t)GPIO_YELLOWLED, GPIO_MODE_OUTPUT);
++  gpio_set_direction((gpio_num_t)GPIO_REDLED, GPIO_MODE_OUTPUT);
++
++  rtc_clk_cpu_freq_set(RTC_CPU_FREQ_240M);
++  gpio_set_level((gpio_num_t)GPIO_REDLED, 1);
+   mount_filesystem();                       // mount the filesystem!
++  gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+   _emu = NewEmulator();                     // create the emulator!
+-  hid_init("emu32");                        // bluetooth hid on core 1!
++
++  // Quack hardwired player A or B
++  if (gpio_get_level((gpio_num_t)GPIO_ADBSRC) == 0)
++  	printf("Hardwired controller is player 1\n");
++  else
++  	printf("Hardwired controller is player 2\n");
++
++  if (gpio_get_level((gpio_num_t)GPIO_BTOFF) == 0) {
++    	printf("Bluetooth is OFF\n");
++  }
++  else {
++  	printf("Bluetooth is ON\n");
++  	hid_init("emu32");                        // bluetooth hid on core 1!
++  }
+ 
+   #ifdef SINGLE_CORE
+   emu_init();
+@@ -132,10 +194,10 @@ void perf()
+   if (_drawn >= _next) {
+     float elapsed_us = 120*1000000/(_emu->standard ? 60 : 50);
+     _next = _drawn + 120;
+-    
++
+     printf("frame_time:%d drawn:%d displayed:%d blit_ticks:%d->%d, isr time:%2.2f%%\n",
+       _frame_time/240,_drawn,_frame_counter,_blit_ticks_min,_blit_ticks_max,(_isr_us*100)/elapsed_us);
+-      
++
+     _blit_ticks_min = 0xFFFFFFFF;
+     _blit_ticks_max = 0;
+     _isr_us = 0;
+@@ -147,7 +209,7 @@ void perf(){};
+ 
+ // this loop always runs on app_core (1).
+ void loop()
+-{    
++{
+   #ifdef SINGLE_CORE
+   emu_loop();
+   #else
+@@ -162,9 +224,10 @@ void loop()
+     }
+   }
+   #endif
+-  
++
+   // update the bluetooth edr/hid stack
+-  hid_update();
++  if (gpio_get_level((gpio_num_t)GPIO_BTOFF) == 1)
++    hid_update();
+ 
+   // Dump some stats
+   perf();
+diff --git a/src/emu.cpp b/src/emu.cpp
+index 068f6f6..f3efef4 100644
+--- a/src/emu.cpp
++++ b/src/emu.cpp
+@@ -21,12 +21,15 @@ using namespace std;
+ // Map files into memory for carts bigger than physical RAM
+ // Handly for NES/SMS carts
+ // Uses app1 as a cache with a crappy FS on top - default arduino config gives 1280k
++// if using optional quack optimised partition sheme, can go up to 1664k
+ 
+ #ifdef ESP_PLATFORM
+ #include <esp_spi_flash.h>
+ #include <esp_attr.h>
+ #include <esp_partition.h>
+ #include "rom/miniz.h"
++#include "driver/gpio.h"
++#define GPIO_REDLED		27
+ 
+ // only map 1 file at a time
+ spi_flash_mmap_handle_t _file_handle = 0;
+@@ -114,31 +117,38 @@ public:
+ 
+     void reformat()
+     {
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 1);
+         esp_partition_erase_range(_part,0,_part->size); // erase entire partition
+         memset(_buf,0xFF,sizeof(DIR_BLOCK_SIZE));       // only use the first 16k of first block
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+     }
+ 
+     uint8_t* mmap(const FlashFile* file)
+     {
+         if (!file)
+             return 0;
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 1);
+         printf("CrapFS::mmap mapping %s offset:%08X len:%d\n",file->name,file->offset,file->len);
+         void* data = 0;
+         if (esp_partition_mmap(_part, file->offset, file->len, SPI_FLASH_MMAP_DATA, (const void**)&data, &_file_handle) == 0)
+         {
+             printf("CrapFS::mmap mapped to %08X\n",data);
++            gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+             return (uint8_t*)data;
+         }
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+         return 0;
+     }
+ 
+     // see if the file exists
+     FlashFile* find(const std::string& path)
+     {
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 1);
+         for (int i = 0; i < _count; i++) {
+             if (_dir[i].sig == FSIG && strcmp(_dir[i].name,path.c_str()) == 0)
+                 return _dir + i;
+         }
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+         return NULL;
+     }
+ 
+@@ -147,6 +157,7 @@ public:
+         FILE *f = fopen(path.c_str(), "rb");
+         if (!f)
+             return -1;
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 1);
+         #define BUF_SIZE 4096
+         uint8_t* buf = new uint8_t[BUF_SIZE];
+         esp_err_t err;
+@@ -164,6 +175,7 @@ public:
+         }
+         fclose(f);
+         delete buf;
++        gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+         return err;
+     }
+ 
+@@ -173,6 +185,7 @@ public:
+         uint32_t start = 0x10000;
+         for (int i = 0; i < _count; i++) {
+             if (_dir[i].sig != FSIG) {
++                gpio_set_level((gpio_num_t)GPIO_REDLED, 1);
+                 _dir[i].sig = FSIG;
+                 _dir[i].offset = start;
+                 _dir[i].len = len;  //
+@@ -185,6 +198,7 @@ public:
+                     printf("CrapFS::create dir write failed %d\n",err);
+                     return NULL;
+                 }
++                gpio_set_level((gpio_num_t)GPIO_REDLED, 0);
+                 if (copy(path,start,len))
+                     return NULL;
+                 return _dir+i;
+diff --git a/src/emu.h b/src/emu.h
+index f8d024b..c58ca3b 100644
+--- a/src/emu.h
++++ b/src/emu.h
+@@ -148,7 +148,7 @@ extern "C" FILE* mkfile(const char* path);
+ extern "C" int unpack(const char* dst_path, const uint8_t* d, int len);
+ 
+ void audio_write_16(const int16_t* s, int len, int channels);
+-int get_hid_ir(uint8_t* dst);
++extern "C" int get_hid_nintendo(uint8_t* dst);
+ uint32_t generic_map(uint32_t m, const uint32_t* target);
+ 
+ Emu* NewAtari800(int ntsc = 1);
+diff --git a/src/emu_nofrendo.cpp b/src/emu_nofrendo.cpp
+index df905b2..aae1268 100644
+--- a/src/emu_nofrendo.cpp
++++ b/src/emu_nofrendo.cpp
+@@ -15,6 +15,9 @@
+ ** SOFTWARE.
+ */
+ 
++/* from CornN64 commit 063b08f7479beb147960c99396b09bdb0b8746b4 */
++#include "freertos/FreeRTOS.h"
++#include "freertos/task.h"
+ #include "emu.h"
+ #include "media.h"
+ 
+@@ -24,6 +27,13 @@ extern "C" {
+ };
+ #include "math.h"
+ 
++//#define CALC_PALETTES
++//recalculated color samples from CornN64 commit a5ea467c4f39ff4a01c5639e527a88eae78080fc */
++// Choose either rossumur OG palettes or CornN64 ones below
++// OG black is a little washed on my TFT Samsung but colors are vivid
++// Second one palettes black is good but picture is too dark
++// Third is way better but still a little too dark on dark tones on my old TFT
++
+ using namespace std;
+ 
+ // https://wiki.nesdev.com/w/index.php/NTSC_video
+@@ -40,7 +50,8 @@ uint32_t nes_3_phase[64] = {
+     0x45454500,0x423B4200,0x403B4400,0x3D3D4500,0x3B404400,0x3B424200,0x3B444000,0x3D453D00,
+     0x40443B00,0x42423B00,0x44403B00,0x453D3D00,0x443B4000,0x39393900,0x17171700,0x17171700,
+ };
+-uint32_t nes_4_phase[64] = {
++
++/*uint32_t nes_4_phase[64] = {
+     0x2C2C2C2C,0x241D1F26,0x221D2227,0x1F1D2426,0x1D1F2624,0x1D222722,0x1D24261F,0x1F26241D,
+     0x2227221D,0x24261F1D,0x26241D1F,0x27221D22,0x261F1D24,0x14141414,0x14141414,0x14141414,
+     0x38383838,0x2C25272E,0x2A252A2F,0x27252C2E,0x25272E2C,0x252A2F2A,0x252C2E27,0x272E2C25,
+@@ -49,11 +60,33 @@ uint32_t nes_4_phase[64] = {
+     0x373C3732,0x3A3C3533,0x3C3A3335,0x3C373237,0x3C35333A,0x2B2B2B2B,0x16161616,0x16161616,
+     0x45454545,0x423B3D44,0x403B4045,0x3D3B4244,0x3B3D4442,0x3B404540,0x3B42443D,0x3D44423B,
+     0x4045403B,0x42443D3B,0x44423B3D,0x45403B40,0x443D3B42,0x39393939,0x17171717,0x17171717,
+-};
++};*/
++
++//RGB palette from http://drag.wootest.net/misc/palgen.html -> YUV -> QAM on color carrier -> 4 phases sampled
++/*uint32_t nes_4_phase[64] = {
++	0x24242424,0x1A0E1420,0x1C0C1424,0x1B0D1523,0x15142020,0x0E1C2719,0x0D1D2717,0x0F1B2216,
++	0x13161815,0x19181415,0x1C1A1516,0x1C1A1516,0x1B16141A,0x14141414,0x14141414,0x14141414,
++	0x39393939,0x30151631,0x2B0D1735,0x1F122835,0x12193730,0x0A234026,0x072C411C,0x112C381C,
++	0x1D2B291C,0x2A27181B,0x2E29161B,0x3028161E,0x321F1629,0x14141414,0x14141414,0x14141414,
++	0x50505050,0x47241E41,0x39222940,0x30253742,0x29304D45,0x26374D3C,0x243F4D32,0x23484D29,
++	0x2D484126,0x3A452F25,0x463E2027,0x4E341831,0x502C183C,0x1E1E1E1E,0x14141414,0x14141414,
++	0x50505050,0x4C3D3A4A,0x463B3E49,0x413C4549,0x3F434F4B,0x3E454F48,0x3D494F43,0x3D4D4F3F,
++	0x414E4A3D,0x464C433D,0x4B483C3F,0x4F443843,0x50413848,0x3B3B3B3B,0x14141414,0x14141414
++};*/
+ 
++uint32_t nes_4_phase[64] = {
++	0x27272727,0x1B16191E,0x1D151921,0x1C151920,0x1A1A1F20,0x171E231C,0x171E231C,0x171C201A,
++	0x17191A18,0x1B1A1819,0x1D1C191A,0x1D1C191A,0x1C1A191C,0x17171717,0x17171717,0x17171717,
++	0x3A3A3A3A,0x2C1F1F2C,0x281A1E2D,0x231D282E,0x1E212F2C,0x1A263428,0x192A3423,0x1D2A3023,
++	0x23292822,0x28261F20,0x2A281F21,0x2B271F23,0x2D241F28,0x17171717,0x17171717,0x17171717,
++	0x50505050,0x3E2D2A3B,0x362B2F3A,0x332E373C,0x33374441,0x313A443C,0x303D4437,0x2F414332,
++	0x34413D30,0x393E342E,0x3D3A2B2F,0x41352733,0x43312839,0x21212121,0x17171717,0x17171717,
++	0x50505050,0x48414047,0x443F4146,0x43404447,0x44454B4A,0x43464B47,0x42484B45,0x424A4B43,
++	0x444A4842,0x46494442,0x48474142,0x4A453F44,0x4A433F46,0x3C3C3C3C,0x17171717,0x17171717
++};
+ 
+ // PAL yuyv table, must be in RAM
+-uint32_t _nes_yuv_4_phase_pal[] = {
++/*uint32_t _nes_yuv_4_phase_pal[] = {
+     0x31313131,0x2D21202B,0x2720252D,0x21212B2C,0x1D23302A,0x1B263127,0x1C293023,0x202B2D22,
+     0x262B2722,0x2C2B2122,0x2F2B1E23,0x31291F27,0x30251F2A,0x18181818,0x19191919,0x19191919,
+     0x3D3D3D3D,0x34292833,0x2F282D34,0x29283334,0x252B3732,0x232E392E,0x2431382B,0x28333429,
+@@ -71,8 +104,51 @@ uint32_t _nes_yuv_4_phase_pal[] = {
+     0x3D423B35,0x37414136,0x323F4538,0x313C473B,0x3239463F,0x2F2F2F2F,0x1A1A1A1A,0x1A1A1A1A,
+     0x49494949,0x3D414845,0x43404245,0x463F3D44,0x453D3B43,0x453E3B42,0x45423B3F,0x46473E3E,
+     0x454A433E,0x3E48463D,0x3943483E,0x38404A42,0x39404B44,0x3E3E3E3E,0x1B1B1B1B,0x1B1B1B1B,
++};/*
++
++//RGB palette from http://drag.wootest.net/misc/palgen.html -> YUV -> QAM on color carrier -> 4 phases sampled
++/*uint32_t _nes_yuv_4_phase_pal[] = {
++	0x1B1B1B1B,0x110B0E14,0x120A0F16,0x120B0F16,0x0F0F1515,0x0C131912,0x0C141911,0x0C121610,
++	0x0D0F0F0E,0x11100E0F,0x12110F0F,0x12110F0F,0x120F0E11,0x0D0D0D0D,0x0D0D0D0D,0x0D0D0D0D,
++	0x2C2C2C2C,0x20131321,0x1D0E1322,0x17111C23,0x12152420,0x0D1A291C,0x0C1E2916,0x111F2417,
++	0x171D1C16,0x1C1B1315,0x1F1C1315,0x201C1317,0x2118131D,0x0D0D0D0D,0x0D0D0D0D,0x0D0D0D0D,
++	0x3F3F3F3F,0x31201C2E,0x291E212D,0x2520292E,0x24283633,0x232B362D,0x212F3628,0x21333623,
++	0x25332F22,0x2B302620,0x302C1D21,0x34271926,0x36231A2C,0x15151515,0x0D0D0D0D,0x0D0D0D0D,
++	0x3F3F3F3F,0x39313038,0x35303137,0x33313537,0x34353B3A,0x33373B38,0x32383B35,0x323A3B33,
++	0x343A3832,0x36393432,0x39373133,0x3A352F34,0x3B332F37,0x2E2E2E2E,0x0D0D0D0D,0x0D0D0D0D,
++
++	0x1B1B1B1B,0x0E0B1114,0x0F0A1216,0x0F0B1216,0x150F0F15,0x19130C12,0x19140C11,0x16120C10,
++	0x0F0F0D0E,0x0E10110F,0x0F11120F,0x0F11120F,0x0E0F1211,0x0D0D0D0D,0x0D0D0D0D,0x0D0D0D0D,
++	0x2C2C2C2C,0x13132021,0x130E1D22,0x1C111723,0x24151220,0x291A0D1C,0x291E0C16,0x241F1117,
++	0x1C1D1716,0x131B1C15,0x131C1F15,0x131C2017,0x1318211D,0x0D0D0D0D,0x0D0D0D0D,0x0D0D0D0D,
++	0x3F3F3F3F,0x1C20312E,0x211E292D,0x2920252E,0x36282433,0x362B232D,0x362F2128,0x36332123,
++	0x2F332522,0x26302B20,0x1D2C3021,0x19273426,0x1A23362C,0x15151515,0x0D0D0D0D,0x0D0D0D0D,
++	0x3F3F3F3F,0x30313938,0x31303537,0x35313337,0x3B35343A,0x3B373338,0x3B383235,0x3B3A3233,
++	0x383A3432,0x34393632,0x31373933,0x2F353A34,0x2F333B37,0x2E2E2E2E,0x0D0D0D0D,0x0D0D0D0D
++};*/
++
++uint32_t _nes_yuv_4_phase_pal[] = {
++	0x26262626,0x1A10151F,0x1B0E1523,0x1B0F1622,0x16161F20,0x101C261A,0x101E2618,0x111B2117,
++	0x14161815,0x19181516,0x1C1A1517,0x1C1A1517,0x1B16151A,0x14141414,0x14141414,0x14141414,
++	0x3C3C3C3C,0x30181931,0x2B111933,0x21152834,0x161C3630,0x0F253E28,0x0D2C3E1F,0x152D371F,
++	0x202B291E,0x2A281A1C,0x2E29191D,0x2F281920,0x3121192A,0x14141414,0x14141414,0x14141414,
++	0x55555555,0x47292442,0x3B262C41,0x332A3942,0x2E354E47,0x2C3B4E3F,0x2A414D36,0x29494D2E,
++	0x3249422B,0x3C453329,0x463F252C,0x4D371E34,0x4F2F1E3E,0x1F1F1F1F,0x14141414,0x14141414,
++	0x55555555,0x4F42404D,0x493F424C,0x4541484C,0x4548524F,0x434A524C,0x424C5248,0x43505245,
++	0x46514D42,0x4A4F4742,0x4E4C4144,0x52483E47,0x52453E4B,0x3F3F3F3F,0x14141414,0x14141414,
++
++	0x26262626,0x15101A1F,0x150E1B23,0x160F1B22,0x1F161620,0x261C101A,0x261E1018,0x211B1117,
++	0x18161415,0x15181916,0x151A1C17,0x151A1C17,0x15161B1A,0x14141414,0x14141414,0x14141414,
++	0x3C3C3C3C,0x19183031,0x19112B33,0x28152134,0x361C1630,0x3E250F28,0x3E2C0D1F,0x372D151F,
++	0x292B201E,0x1A282A1C,0x19292E1D,0x19282F20,0x1921312A,0x14141414,0x14141414,0x14141414,
++	0x55555555,0x24294742,0x2C263B41,0x392A3342,0x4E352E47,0x4E3B2C3F,0x4D412A36,0x4D49292E,
++	0x4249322B,0x33453C29,0x253F462C,0x1E374D34,0x1E2F4F3E,0x1F1F1F1F,0x14141414,0x14141414,
++	0x55555555,0x40424F4D,0x423F494C,0x4841454C,0x5248454F,0x524A434C,0x524C4248,0x52504345,
++	0x4D514642,0x474F4A42,0x414C4E44,0x3E485247,0x3E45524B,0x3F3F3F3F,0x14141414,0x14141414
+ };
+ 
++#ifdef CALC_PALETTES
++
+ static void make_nes_pal_uv(uint8_t *u,uint8_t *v)
+ {
+     for (int c = 0; c < 16; c++) {
+@@ -152,6 +228,8 @@ static void make_nes_palette(int phases)
+     printf("};\n");
+ }
+ 
++#endif
++
+ uint8_t* _nofrendo_rom = 0;
+ extern "C"
+ char *osd_getromdata()
+@@ -219,9 +297,11 @@ public:
+ 
+     virtual void gen_palettes()
+     {
++#ifdef CALC_PALETTES
+         make_nes_palette(3);
+         make_nes_palette(4);
+         make_alt_pal();
++#endif
+     }
+ 
+     virtual int info(const string& file, vector<string>& strs)
+@@ -437,7 +517,11 @@ public:
+             return -1;
+         }
+ 
+-        nes_emulate_init(path.c_str(),width,height);
++        // from CornN64 commit 063b08f7479beb147960c99396b09bdb0b8746b4
++        if (nes_emulate_init(path.c_str(),width,height))
++			printf("NES init failed\n");
++
++        vTaskDelay(100 / portTICK_RATE_MS);
+         _lines = nes_emulate_frame(true);   // first frame!
+         return 0;
+     }
+@@ -453,7 +537,7 @@ public:
+     {
+         return _lines;
+     }
+-    
++
+     virtual int audio_buffer(int16_t* b, int len)
+     {
+         int n = frame_sample_count();
+diff --git a/src/gui.cpp b/src/gui.cpp
+index 2b2009a..db0a68a 100644
+--- a/src/gui.cpp
++++ b/src/gui.cpp
+@@ -17,6 +17,11 @@
+ 
+ #include "emu.h"
+ 
++#include "freertos/FreeRTOS.h"
++#include "driver/gpio.h"
++#define GPIO_GREENLED	21
++#define GPIO_BTOFF		33
++
+ using namespace std;
+ 
+ string get_ext(const string& s)
+@@ -633,7 +638,7 @@ public:
+         }
+         _hilited = max(0,min(_hilited,c-1));
+     }
+-    
++
+     int count()
+     {
+         switch (_tab) {
+@@ -1007,13 +1012,24 @@ void gui_update()
+     _gui.update_video();
+ 
+     uint8_t buf[64];
+-    int n = hid_get(buf,sizeof(buf));    // called from emulation loop
+-    if (n > 0)
+-        gui_hid(buf,n);
+-    
+-    n = get_hid_ir(buf);
++    int n;
++    if (gpio_get_level((gpio_num_t)GPIO_BTOFF) == 1)
++    {
++         n = hid_get(buf,sizeof(buf));    // called from emulation loop
++         if (n > 0)
++             gui_hid(buf,n);
++    }
++    n = get_hid_nintendo(buf);
+     if (n > 0)
+-        gui_hid(buf,n);
++    {
++    		gui_hid(buf,n);
++     	// since code cleaning, we are a little too fast over here and the menu
++    		// bluetooth OFF is even faster. click sound doesn't always fully play.
++    		// this helps with menu flickering as well
++    		// only slow down with bluetooth off otherwise it fuck the HID server badly
++		if (gpio_get_level((gpio_num_t)GPIO_BTOFF) == 0)
++        		ets_delay_us(5000);
++     }
+ }
+ 
+ void gui_key(int keycode, int pressed, int mods)
+@@ -1077,6 +1093,7 @@ static void ir(const uint8_t* j, int len)
+     pad_key(GENERIC_DOWN,pad,81);   // down
+     pad_key(GENERIC_RIGHT,pad,79);   // right
+     pad_key(GENERIC_LEFT,pad,80);     // left
++    pad_key(GENERIC_OTHER,pad,58);	// home/gui (NES controller)
+     pad_key(GENERIC_RESET | GENERIC_FIRE_Z,pad,58);   // home/gui
+     pad_key(GENERIC_FIRE | GENERIC_FIRE_C | GENERIC_FIRE_B | GENERIC_FIRE_A,pad,40); // enter (A)
+     _last_pad = pad;
+diff --git a/src/hid_server/hid_server.cpp b/src/hid_server/hid_server.cpp
+index 9672f2c..d041807 100644
+--- a/src/hid_server/hid_server.cpp
++++ b/src/hid_server/hid_server.cpp
+@@ -27,6 +27,10 @@ using namespace std;
+ #include "hci_server.h"
+ #include "hid_server.h"
+ 
++// for bluetooth and hardwired coexistance, Quack jumpers
++#include "driver/gpio.h"
++#define GPIO_ADBSRC		32
++
+ enum {
+     HID_SDP_PSM = 0x0001,
+     HID_CONTROL_PSM = 0x0011,
+@@ -598,6 +602,10 @@ public:
+         if (d->_wii_index == -1)
+         {
+             for (int i = 0; i < 4; i++) {
++                if ((gpio_get_level((gpio_num_t)GPIO_ADBSRC) == 0) && i == 0)
++                	continue;
++                if ((gpio_get_level((gpio_num_t)GPIO_ADBSRC) == 1) && i == 1)
++                	continue;
+                 if (wii_states[i].flags == 0) {
+                     wii_states[i].flags = wiimote;
+                     d->_wii_index = i;
+@@ -945,7 +953,7 @@ class HIDSource {
+                 if (d)
+                     d->socket_changed(cb.ss.socket,cb.ss.state);
+                 break;
+-                
++
+             default:
+                 break;
+         }
+diff --git a/src/video_out.h b/src/video_out.h
+index 57b82e8..866ae1f 100644
+--- a/src/video_out.h
++++ b/src/video_out.h
+@@ -15,9 +15,22 @@
+ ** SOFTWARE.
+ */
+ 
+-#define VIDEO_PIN   26
+-#define AUDIO_PIN   18  // can be any pin
+-#define IR_PIN      0   // TSOP4838 or equivalent on any pin if desired
++#define VIDEO_PIN   25  // just for information, not selectable due to hardware limitations
++#define AUDIO_PIN   2   // can be any pin
++
++//NES classic controller (wire colors might be different, double check!)
++//       ___
++//DATA  |o o| NC
++//LATCH |o o| NC
++//CLK   |o o/ 5V
++//GND   |o_/
++//
++//5V (red) (5V on Quack due to hardware buffers)
++//GND (white)
++#define NES_CTRL_DAT 4     //    # DATA controller (A or B)	(black)
++#define NES_CTRL_LATCH 14  //    # LATCH	(yellow)
++#define NES_CTRL_CLK 12    //    # CLOCK 	(green)
++//On Quack, utilise the ADB buffer as RX for DATA and the Quadrature buffer as TX for clocks et al
+ 
+ int _pal_ = 0;
+ 
+@@ -42,11 +55,13 @@ int _pal_ = 0;
+ #include "driver/gpio.h"
+ #include "driver/i2s.h"
+ 
+-#ifdef IR_PIN
+-#include "ir_input.h"  // ir peripherals
++#ifdef NES_CTRL_LATCH
++#include "driver/gpio.h"
++extern "C" {
++#include "nintendo.h"  // hard wired Nintendo controllers
++}
+ #endif
+ 
+-
+ //====================================================================================================
+ //====================================================================================================
+ //
+@@ -97,7 +112,7 @@ static esp_err_t start_dma(int line_width,int samples_per_cc, int ch = 1)
+         _dma_desc[i].buf = (uint8_t*)heap_caps_calloc(1, n, MALLOC_CAP_DMA);
+         if (!_dma_desc[i].buf)
+             return -1;
+-        
++
+         _dma_desc[i].owner = 1;
+         _dma_desc[i].eof = 1;
+         _dma_desc[i].length = n;
+@@ -171,9 +186,12 @@ void video_init_hw(int line_width, int samples_per_cc)
+     ledcAttachPin(AUDIO_PIN, 0);
+     ledcWrite(0,0);
+ 
+-    //  IR input if used
+-#ifdef IR_PIN
+-    pinMode(IR_PIN,INPUT);
++	// Pin mappings for NES controller input
++#ifdef NES_CTRL_LATCH
++	pinMode(NES_CTRL_LATCH, GPIO_MODE_OUTPUT);
++	digitalWrite(NES_CTRL_LATCH, 0);
++	pinMode(NES_CTRL_CLK, GPIO_MODE_OUTPUT);
++	digitalWrite(NES_CTRL_CLK, 1);
+ #endif
+ }
+ 
+@@ -255,12 +273,12 @@ uint32_t xthal_get_ccount() {
+ 
+ void audio_sample(uint8_t s);
+ 
+-void ir_sample();
+-
+-int get_hid_ir(uint8_t* buf)
++extern "C" {
++int get_hid_nintendo(uint8_t* buf)
+ {
+     return 0;
+ }
++}
+ 
+ #endif
+ 
+@@ -351,10 +369,10 @@ void video_init(int samples_per_cc, int machine, const uint32_t* palette, int nt
+         _hsync = usec(4.7);
+         _pal_ = 0;
+     } else {
+-        pal_init();
+         _pal_ = 1;
++        pal_init();
+     }
+-    
++
+     _active_lines = 240;
+     video_init_hw(_line_width,_samples_per_cc);    // init the hardware
+ }
+@@ -439,7 +457,7 @@ void IRAM_ATTR blit_pal(uint8_t* src, uint16_t* dst)
+ 
+                 i += 4;
+                 c = *((uint32_t*)(src+i));
+-                
++
+                 // make 5 colors out of 4 by interpolating y: 0000 0111 1122 2223 3333
+                 c0 = c;
+                 c1 = c >> 8;
+@@ -478,7 +496,7 @@ void IRAM_ATTR blit_pal(uint8_t* src, uint16_t* dst)
+               p = _palette + 64;
+             dst += 88;
+             break;
+-          
++
+         case EMU_SMS:
+             // 192 of 288 color clocks wide: roughly correct aspect ratio
+             dst += 88;
+@@ -795,10 +813,6 @@ void IRAM_ATTR video_isr(volatile void* vbuf)
+     audio_sample(s);
+     //audio_sample(_sin64[_x++ & 0x3F]);
+ 
+-#ifdef IR_PIN
+-    ir_sample();
+-#endif
+-
+     int i = _line_counter++;
+     uint16_t* buf = (uint16_t*)vbuf;
+     if (_pal_) {
+@@ -810,8 +824,7 @@ void IRAM_ATTR video_isr(volatile void* vbuf)
+             burst(buf);
+             blit(_lines[i-32],buf + _active_start);
+         } else if (i < 304) {                   // post render/black 272-304
+-            if (i < 272)                        // slight optimization here, once you have 2 blanking buffers
+-                blanking(buf,false);
++            blanking(buf,false);
+         } else {
+             pal_sync(buf,i);                    // 8 lines of sync 304-312
+         }
