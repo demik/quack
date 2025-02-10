@@ -1,4 +1,4 @@
-## v1.4.9 (pre)
+## v1.4.9
 - added basic support for some PDP Rock Candy Wiimotes
 	- BDAs starting from the range 08:03:64
 	- remote doesn't reconnect correctly, have to repair each time
