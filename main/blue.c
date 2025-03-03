@@ -54,6 +54,7 @@
 #include "gpio.h"
 #include "led.h"
 #include "m4848.h"
+#include "mighty.h"
 #include "wii.h"
 
 /* debug tag */
@@ -427,6 +428,10 @@ void blue_h_input(esp_hidh_dev_t *dev, uint16_t id, uint8_t *data, uint16_t leng
      uint16_t vid = esp_hidh_dev_vendor_id_get(dev);
      uint16_t pid = esp_hidh_dev_product_id_get(dev);
 
+	if (mighty_is_mm(vid, pid)) {
+		mighty_input(dev, id, data, length);
+		return;
+	}
 	if (wii_is_wiimote(vid, pid)) {
 		wii_input(dev, id, data, length);
 		return;

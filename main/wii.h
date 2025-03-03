@@ -19,8 +19,7 @@
  *
  */
 
-#ifndef WII_H
-#define WII_H
+#pragma once
 
 /* prototypes */
 uint8_t *wii_generate_pin(esp_bt_pin_code_t pin);
@@ -95,4 +94,3 @@ typedef struct wii_accel_s {
 	uint16_t z;
 } wii_accel_t;
 
-#endif

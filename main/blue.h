@@ -19,8 +19,7 @@
  *
  */
 
-#ifndef BLUE_H
-#define BLUE_H
+#pragma once
 
 /* defines */
 #define BLUE_SCAN_DURATION 6
@@ -46,6 +45,4 @@ void	blue_set_boot_protocol(esp_hidh_dev_t *dev);
 
 /* global variables for tasks handles */
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
-
-#endif
 

@@ -4,6 +4,7 @@ set(srcs "adb.c"
 	 "gpio.c"
 	 "led.c"
 	 "main.c"
+	 "mighty.c"
 	 "quad.c"
 	 "wii.c")
 
