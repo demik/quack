@@ -1,8 +1,7 @@
 
-# Quack Mouse Converter   [![Badge License]][License]
+# Quack Mouse Converter   [![Badge License]][License]&nbsp;[![Badge CI]][CI]
 
-A dongle that allows various retro systems to use the `Apple Desktop Bus` <br>
-as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
+A dongle that allows various retro systems to use the `Apple Desktop Bus` as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 <br>
 <br>
@@ -18,10 +17,7 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 <br>
 <br>
 
-<img
-    src = 'Images/Preview.png'
-    width = 500
-/>
+<img src = 'Images/Preview.png' width = 500 />
 
 </div>
 
@@ -47,7 +43,6 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 
 <br>
 
-
 <!----------------------------------------------------------------------------->
 
 [Documentation]: https://github.com/demik/quack/wiki
@@ -56,12 +51,12 @@ as well as `Bluetooth 2+` mice through their `quadrature` mouse ports.
 [Firmware]: main/README.md
 [License]: LICENSE
 [PCB]: EDA/ChangeLog.md
-
+[CI]: https://github.com/demik/quack/actions/workflows/idf.yml
 
 <!-------------------------------[ Badges ]----------------------------------->
 
-[Badge License]: https://img.shields.io/badge/License-Apache_2.0-961b1f?style=for-the-badge&labelColor=D22128
-
+[Badge License]: https://img.shields.io/badge/License-Apache_2.0-961b1f?labelColor=D22128
+[Badge CI]: https://github.com/demik/quack/actions/workflows/idf.yml/badge.svg?branch=master&event=push
 
 <!-------------------------------[ Buttons ]----------------------------------->
 
