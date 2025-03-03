@@ -561,7 +561,7 @@ void blue_h_open(esp_hidh_event_data_t *p) {
 
 	blue_pointers++;
 	xTaskNotify(t_blue, LED_ON, eSetValueWithOverwrite);
-	gpio_output_enable();
+	gpio_transceiver_enable();
 }
 
 /* get specific report from report map matching specified usage + type + protocol */

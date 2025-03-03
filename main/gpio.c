@@ -73,10 +73,10 @@ void	gpio_init(void) {
 	gpio_set_direction(GPIO_QY2, GPIO_MODE_OUTPUT);
 }
 
-void    gpio_output_disable(void) {
+void    gpio_transceiver_disable(void) {
 	gpio_set_level(GPIO_OE, 1);
 }
 
-void    gpio_output_enable(void) {
+void    gpio_transceiver_enable(void) {
 	gpio_set_level(GPIO_OE, 0);
 }

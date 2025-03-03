@@ -1,8 +1,8 @@
 diff --git a/components/esp_hid/src/bt_hidh.c b/components/esp_hid/src/bt_hidh.c
-index 6f0410e302..59dfc0b07f 100644
+index 6b33beee5e..53a99af52d 100644
 --- a/components/esp_hid/src/bt_hidh.c
 +++ b/components/esp_hid/src/bt_hidh.c
-@@ -673,7 +673,7 @@ static void esp_hh_cb(esp_hidh_cb_event_t event, esp_hidh_cb_param_t *param)
+@@ -668,7 +668,7 @@ static void esp_hh_cb(esp_hidh_cb_event_t event, esp_hidh_cb_param_t *param)
                  if (param->data_ind.len == 9 && *(param->data_ind.data) == 1) {
                      has_report_id = true;
                      _usage = ESP_HID_USAGE_KEYBOARD;

@@ -74,7 +74,7 @@ void app_main(void)
 	if (gpio_get_level(GPIO_BTOFF) == 1)
 		blue_init();
 	else
-		gpio_output_enable();
+		gpio_transceiver_enable();
 
 	/* put LED error ON if no inputs (/BTOFF and no /ADBSRC) */
 	if (gpio_get_level(GPIO_BTOFF) == 0 && gpio_get_level(GPIO_ADBSRC) == 1) {

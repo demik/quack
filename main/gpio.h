@@ -24,8 +24,8 @@
 
 /* prototypes */
 void	gpio_init(void);
-void    gpio_output_disable(void);
-void    gpio_output_enable(void);
+void    gpio_transceiver_disable(void);
+void    gpio_transceiver_enable(void);
 
 /* GPIO pins definitions
  *
