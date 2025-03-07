@@ -1,3 +1,9 @@
+## v1.4.10
+- update to ESP-IDF v5.4.0
+	- https://github.com/espressif/esp-idf/releases/tag/v5.4
+	- fixed stabilities where Quack would reboot on BT disconnect
+- added support for Apple Mighty Mouse (Bluetooth)
+
 ## v1.4.9
 - added basic support for some PDP Rock Candy Wiimotes
 	- BDAs starting from the range 08:03:64
