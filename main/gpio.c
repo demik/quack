@@ -24,9 +24,35 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "esp_log.h"
 #include "esp_system.h"
 
 #include "gpio.h"
+
+/* defines */
+#define TAG "GPIO"
+
+/* global values */
+QueueHandle_t q_flash = NULL;
+
+/* prototypes */
+static void gpio_flash(void* arg);
+static void gpio_isr_handler(void* arg);
+
+static void gpio_flash(void* arg) {
+	uint32_t gpio_num;
+
+	(void)arg;
+
+	ESP_LOGI(TAG, "flash task started on core %d", xPortGetCoreID());
+	while (1) {
+		if (xQueueReceive(q_flash, &gpio_num, portMAX_DELAY)) {
+			configASSERT(gpio_num == 0);
+			ESP_LOGW(TAG, "flash switch changed, restarting");
+			esp_restart();
+		}
+	}
+}
 
 void	gpio_init(void) {
 	/* LEDs */
@@ -71,6 +97,19 @@ void	gpio_init(void) {
 	gpio_set_direction(GPIO_QX2, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QY1, GPIO_MODE_OUTPUT);
 	gpio_set_direction(GPIO_QY2, GPIO_MODE_OUTPUT);
+
+	/* Flash mode watchdog */
+	gpio_reset_pin(GPIO_FLASH);
+	gpio_set_direction(GPIO_FLASH, GPIO_MODE_INPUT);
+	q_flash = xQueueCreate(10, sizeof(uint32_t));
+	xTaskCreatePinnedToCore(gpio_flash, "FLASH", 2 * 1024, NULL, 10, NULL, 0);
+	gpio_install_isr_service(0);
+	gpio_isr_handler_add(GPIO_FLASH, gpio_isr_handler, (void*) GPIO_FLASH);
+}
+
+static void IRAM_ATTR gpio_isr_handler(void* arg) {
+	uint32_t gpio_num = (uint32_t) arg;
+	xQueueSendFromISR(q_flash, &gpio_num, NULL);
 }
 
 void    gpio_transceiver_disable(void) {
