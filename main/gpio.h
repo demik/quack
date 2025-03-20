@@ -48,7 +48,6 @@ void    gpio_transceiver_enable(void);
  * - GPIO17
  */
 
-#define GPIO_FLASH		0
 #define GPIO_ADB		4
 #define GPIO_CLICK		2
 #define GPIO_QX1		12
