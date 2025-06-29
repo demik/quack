@@ -54,6 +54,7 @@
 #include "gpio.h"
 #include "led.h"
 #include "m4848.h"
+/* #include "m5769.h" */
 #include "mighty.h"
 #include "wii.h"
 
