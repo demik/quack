@@ -1,3 +1,8 @@
+## v1.4.11
+- update to ESP-IDF v5.4.2
+	- https://github.com/espressif/esp-idf/releases/tag/v5.4.2
+	- under ithe hood fixes of some rare stabilities issues
+
 ## v1.4.10
 - update to ESP-IDF v5.4.0
 	- https://github.com/espressif/esp-idf/releases/tag/v5.4
