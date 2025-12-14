@@ -1,3 +1,12 @@
+## PCB 1.5
+- increased R4 from 1.2kΩ to 1.5kΩ
+- replaced ESP32-PICO-D4 by ESP32-PICO-V3
+- replaced 74LVC2T45DCURG4 by 74LVC2T45YZP
+- replaced LBSS84LT1G by SI2301CDS-T1-GE3
+- Silkscreen improvements
+- Routing improvements
+- Upgraded Project for KiCad 9.0 with glue libraries
+
 ## PCB 1.4
 - added resistor on pulldown to match 68040 Macs.
 - tone down LEDs again again again.

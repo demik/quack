@@ -1,9 +1,0 @@
-EESchema-DOCLIB  Version 2.0
-#
-$CMP ESP32-PICO-D4
-D ESP32-PICO-D4 module
-K
-F https://hr.mouser.com/datasheet/2/891/esp32-pico-d4_datasheet_en-1365829.pdf
-$ENDCMP
-#
-#End Doc Library
