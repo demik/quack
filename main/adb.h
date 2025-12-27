@@ -3,7 +3,7 @@
  *  quack
  *
  *  Created by Michel DEPEIGE on 7/01/2021.
- *  Copyright (c) 2020 Michel DEPEIGE.
+ *  Copyright (c) 2020-2025 Michel DEPEIGE.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Apache License, Version 2.0 (the "License");
@@ -25,8 +25,8 @@
 /* prototypes */
 void	adb_init(void);
 bool	adb_is_host(void);
-void    adb_task_host(void *pvParameters);
-void    adb_task_idle(void *pvParameters);
+void adb_task_host(void *pvParameters);
+void adb_task_idle(void *pvParameters);
 
 void	adb_tx_cmd(unsigned char cmd);
 void	adb_tx_data(uint16_t data);
@@ -34,7 +34,6 @@ void	adb_tx_listen(unsigned char cmd, uint16_t data);
 void	adb_tx_reset(void);
 
 /* defines */
-#define RMT_RX_CHANNEL	RMT_CHANNEL_0
 #define tskADB_PRIORITY 4
 
 /* ADB timers */

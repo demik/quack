@@ -3,7 +3,7 @@
  *  quack
  *
  *  Created by Michel DEPEIGE on 7/01/2020.
- *  Copyright (c) 2020-2024 Michel DEPEIGE.
+ *  Copyright (c) 2020-2025 Michel DEPEIGE.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the Apache License, Version 2.0 (the "License");
@@ -20,29 +20,55 @@
  */
 
 #include <stdio.h>
-#include "driver/gpio.h"
+#include <driver/gpio.h>
 #include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
+#include <freertos/ringbuf.h>
+#include <freertos/semphr.h>
+#include <freertos/task.h>
 #include "esp_log.h"
 #include "esp_system.h"
 #include "esp_chip_info.h"
 #include "esp_private/periph_ctrl.h"
-#include "driver/rmt.h"
 #include "soc/periph_defs.h"
 #include "soc/rmt_reg.h"
 
 #include "adb.h"
 #include "led.h"
 #include "gpio.h"
+#include "phy.h"
+
+/*
+ * THEORY OF OPERATION *
+ *
+ * Quack scheduler is running at 250 Hz which give 4 ms running "slots"
+ *
+ * TRANSMITTING *
+ * It's done by toggling the GPIO in an active loop, which is less than ideal because
+ * the RTOS may be scheduling stuff.
+ *
+ * For polling it's ok because the ADB command (TALK) can be send under 4ms so the task
+ * shouldn't be rescheduled. For the initial setup it can be a little longer (up to 12 ms)
+ * so there is risks of being rescheduled here. On can avoid most of it by putting the
+ * transmitting task into high priority and only running others tasks as low priority.
+ *
+ * RECEIVING *
+ * since we can be scheduled anytime during reception, reception is done using the RMT
+ * (Remote Control Transceiver) transceiver of the ESP32.
+ *
+ * Before ESP-IDF v5.0, it was donne using the RMT driver but this has been deprecated
+ * a subset of it for this specific project has been reimplemented within the phy.* files
+ * using the RMT HAL.
+ *
+ * Overall, in order to not push our luck this realistically limit the mouse protocol to
+ * the simpler ones (classic 100 and 200 cpi)
+ */
 
 /* defines */
 #define TAG "ADB"
 
 /* globals */
-rmt_config_t adb_rmt_rx = RMT_DEFAULT_CONFIG_RX(GPIO_ADB, RMT_RX_CHANNEL);
 extern TaskHandle_t t_adb2hid;
 extern TaskHandle_t t_green, t_blue, t_yellow, t_red;
 extern TaskHandle_t t_click;
@@ -50,11 +76,11 @@ extern QueueHandle_t q_qx, q_qy;
 
 /* static defines */
 static void	adb_handle_button(bool action);
-static void	adb_rmt_reset(void);
-static bool	adb_rx_isone(rmt_item32_t cell);
-static bool	adb_rx_isstop(rmt_item32_t cell);
-static bool	adb_rx_iszero(rmt_item32_t cell);
-static uint16_t	IRAM_ATTR adb_rx_mouse();
+static void	adb_phy_reset(void);
+static bool	adb_rx_isone(phy_item32_t cell);
+static bool	adb_rx_isstop(phy_item32_t cell);
+static bool	adb_rx_iszero(phy_item32_t cell);
+static uint16_t adb_rx_mouse(void);
 static void	adb_rx_setup(void);
 static void	adb_scan_macaj(void);
 static void	adb_tx_as(void);
@@ -65,7 +91,7 @@ static void	adb_tx_zero(void);
 
 /* functions */
 static void	adb_handle_button(bool action) {
-	static bool	status = ADB_B_UP;	// Keep state. Click is active low
+	static bool	status = ADB_B_UP;	/* Keep state. Click is active low */
 
 	if (status == ADB_B_UP && action == ADB_B_UP)
 		return ;
@@ -96,13 +122,7 @@ void	adb_init(void) {
 
 	/* avoid console flood when installing/uninstalling RMT driver */
 	esp_log_level_set("intr_alloc", ESP_LOG_INFO);
-
-	/* init RMT RX driver with default values for ADB  */
-	adb_rmt_rx.mem_block_num = 4;
-	adb_rmt_rx.rx_config.filter_en = true;
-	adb_rmt_rx.rx_config.filter_ticks_thresh = 10;
-	adb_rmt_rx.rx_config.idle_threshold = 100;
-	rmt_config(&adb_rmt_rx);
+	phy_config();
 
 	/* If jumper is set, switch to ADB host mode */
 	if (adb_is_host())
@@ -111,11 +131,13 @@ void	adb_init(void) {
 		xTaskCreatePinnedToCore(adb_task_idle, "ADB_IDLE", 6 * 1024, NULL, tskADB_PRIORITY, NULL, 1);
 }
 
-inline bool	adb_is_host(void) {
-	if (gpio_get_level(GPIO_ADBSRC) == 0)
-		return true;
-	else
-		return false;
+/*
+ * This status comes from the ADB Host DIP switch
+ * It is pulled down when enabled
+ */
+
+inline bool adb_is_host(void) {
+	return gpio_get_level(GPIO_ADBSRC) == 0;
 }
 
 /*
@@ -239,9 +261,9 @@ void adb_probe(void) {
  * Somewhat a hack, but resetting the module sometimes help.
  */
 
-static void	adb_rmt_reset() {
+static void	adb_phy_reset() {
 	periph_module_reset(PERIPH_RMT_MODULE);
-	rmt_config(&adb_rmt_rx);
+	phy_config();
 	xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 
 	gpio_set_level(GPIO_ADB, 1);
@@ -299,7 +321,7 @@ void	adb_task_host(void *pvParameters) {
 	ESP_LOGI(TAG, "host started on core %d", xPortGetCoreID());
 
 	/* poll the mouse like a maniac. It will answer only if there is user input */
-	ESP_ERROR_CHECK(rmt_driver_install(RMT_RX_CHANNEL, 256, 0));
+	ESP_ERROR_CHECK(phy_driver_install(256, 0));
 
 	while (true) {
 		/* Should give us a polling rate between 80-90 Hz */
@@ -366,7 +388,9 @@ void	adb_task_host(void *pvParameters) {
 }
 
 /*
- * this do nothing since device mode doesn't work
+ * this do nothing since device mode cannot work with the RMT as is in the ESP32
+ * it needs SOC_RMT_SUPPORT_RX_PINGPONG which is only available in the S3 and others
+ *
  * put level converter on input mode with a pull up to avoid oscillations
  * if plugged into an ADB Bus by mistake.
  */
@@ -374,13 +398,11 @@ void	adb_task_host(void *pvParameters) {
 void	adb_task_idle(void *pvParameters) {
 	ESP_LOGI(TAG, "idle started on core %d", xPortGetCoreID());
 
-	/* RMT is not installed via rmt_driver_install() so no need to uninstall */
 	adb_rx_setup();
 	ESP_ERROR_CHECK(gpio_pullup_en(GPIO_ADB));
 
 	/*
-	 * We sould exit here but for some reason core 1 panic with
-	 * IllegalInstruction if we do... Dunno what's going on here either.
+	 * core always need one task alive so do not exit here
 	 * let's suspend the task instead
 	 */
 
@@ -395,14 +417,14 @@ void	adb_task_idle(void *pvParameters) {
  * units are in µs
  */
 
-static bool adb_rx_isone(rmt_item32_t cell) {
+static bool adb_rx_isone(phy_item32_t cell) {
 	if (cell.level0 == 0 && (cell.duration0 >= 22 && cell.duration0 <= 44) &&
 		cell.level1 == 1 && (cell.duration1 >= 46 && cell.duration1 <= 86))
 		return true;
 	return false;
 }
 
-static bool adb_rx_isstop(rmt_item32_t cell) {
+static bool adb_rx_isstop(phy_item32_t cell) {
 	/* high part of the well is lengh 0 because of RMT timeout (100µs+) */
 	if (cell.level0 == 0 && (cell.duration0 >= 46 && cell.duration0 <= 86) &&
 		cell.level1 == 1 && cell.duration1 == 0)
@@ -410,7 +432,7 @@ static bool adb_rx_isstop(rmt_item32_t cell) {
 	return false;
 }
 
-static bool adb_rx_iszero(rmt_item32_t cell) {
+static bool adb_rx_iszero(phy_item32_t cell) {
 	if (cell.level0 == 0 && (cell.duration0 >= 46 && cell.duration0 <= 86) &&
 		cell.level1 == 1 && (cell.duration1 >= 22 && cell.duration1 <= 44))
 		return true;
@@ -418,27 +440,28 @@ static bool adb_rx_iszero(rmt_item32_t cell) {
 }
 
 static uint16_t	IRAM_ATTR adb_rx_mouse() {
-	uint32_t rmt_status;
+	uint32_t phy_status;
 	uint16_t data = 0;
 	RingbufHandle_t rb = NULL;
-	rmt_item32_t* items = NULL;
+	phy_item32_t* items = NULL;
 	size_t rx_size = 0;
 	size_t i;
 
-	rmt_get_ringbuf_handle(RMT_RX_CHANNEL, &rb);
+	phy_get_ringbuf_handle(&rb);
 	configASSERT(rb != NULL);
-	rmt_rx_start(RMT_RX_CHANNEL, true);
-	items = (rmt_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
-	rmt_get_status(RMT_RX_CHANNEL, &rmt_status);
-	if (((rmt_status >> RMT_STATE_CH0_S) & RMT_STATE_CH0_V) == 4)
-		adb_rmt_reset();
-	rmt_rx_stop(RMT_RX_CHANNEL);
+	phy_rx_start(true);
+	items = (phy_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
+
+	phy_get_status(&phy_status);
+	if (((phy_status >> RMT_STATE_CH0_S) & RMT_STATE_CH0_V) == 4)
+		adb_phy_reset();
+	phy_rx_stop();
 
 	if (items == NULL)
 		return 0;
 
 	/*
- 	 * Mouse response size in bits is events / sizeof(rmt_item32_t) (4)
+	 * Mouse response size in bits is events / sizeof(phy_item32_t) (4)
 	 * start bit + 16 data bits + stop bit = 72 bytes in RMT buffer (18 bits received)
 	 *
 	 * Check start / stop bits and size.
@@ -456,18 +479,18 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 			break;
 		default:
-			ESP_LOGD(TAG, "wrong size of %i bit(s)", rx_size / sizeof(rmt_item32_t));
+			ESP_LOGD(TAG, "wrong size of %i bit(s)", rx_size / sizeof(phy_item32_t));
 			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 	}
 
 	/* check start and stop bits */
-	if (! adb_rx_isone(*(items+0)) && (! adb_rx_isstop(*(items+(rx_size / sizeof(rmt_item32_t) - 1))))) {
+	if (! adb_rx_isone(*(items+0)) && (! adb_rx_isstop(*(items+(rx_size / sizeof(phy_item32_t) - 1))))) {
 		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 		return 0;
 	}
 
 	/* rebuild our data with RMT buffer */
-	for (i = 1; i < ((rx_size / sizeof(rmt_item32_t)) - 1); i++) {
+	for (i = 1; i < ((rx_size / sizeof(phy_item32_t)) - 1); i++) {
 		data <<= 1;
 
 		/* check that every data is either one or zero */

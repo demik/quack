@@ -40,7 +40,7 @@ esp_timer_handle_t quad_qx, quad_qy;
 QueueHandle_t q_qx, q_qy;
 
 /* ISR functions */
-static void	IRAM_ATTR quad_isr(void* arg);
+static void quad_isr(void* arg);
 
 /* phases */
 const bool q1[] = {true, false, false, true};

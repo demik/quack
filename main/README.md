@@ -2,7 +2,7 @@
 
 ### Supported SDK versions:
 
-The code is designed to be build with ESP-IDF SDK version 5.4.0. To workaround some patchs or limitations of this specific release, you need to apply the patch located in the SDK subfolder
+The code is designed to be build with ESP-IDF SDK version 5.5.2. To workaround some patchs or limitations of this specific release, you need to apply the patch located in the SDK subfolder
 
 ### Unsupported mouse conversions:
 

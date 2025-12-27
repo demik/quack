@@ -31,9 +31,9 @@ void    gpio_transceiver_enable(void);
  *
  * pin layout is compatible with ESP32-CAM module for prototyping
  * LEDs aren't avaible on ESP32-CAM but DEBUG LED (Camera connector)
- * 
+ *
  * on ESP32-CAM the following pins are already used:
- * - CSI_MCLK (GPIO0) 
+ * - CSI_MCLK (GPIO0)
  * - U0TXD (GPIO1)
  * - U0TXD (GPIO3)
  * - FLASH (GPIO4)
@@ -56,7 +56,7 @@ void    gpio_transceiver_enable(void);
 #define GPIO_QY2		15
 
 #define GPIO_DIR		19
-#define GPIO_OE			22
+#define GPIO_OE		22
 #define GPIO_ADBSRC		32
 #define GPIO_BTOFF		33
 
