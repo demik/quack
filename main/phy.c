@@ -27,6 +27,7 @@
 #include <freertos/ringbuf.h>
 #include <hal/rmt_hal.h>
 #include <hal/rmt_ll.h>
+#include <hal/rmt_types.h>
 #include <soc/io_mux_reg.h>
 #include <soc/rmt_periph.h>
 
@@ -35,7 +36,7 @@
 #include "sdkconfig.h"
 
 /* defines */
-static const char *TAG = "PHY(ADB)";
+static const char *TAG = "ADB_PHY";
 
 /* spinlock for protecting concurrent register-level access only */
 #define PHY_ENTER_CRITICAL()  portENTER_CRITICAL_SAFE(&(rmt_contex.rmt_spinlock))
@@ -47,7 +48,7 @@ typedef struct {
 	_lock_t rmt_driver_isr_lock;
 	/* Mutex lock for protecting concurrent register/unregister of RMT channels (ISR) */
 	portMUX_TYPE rmt_spinlock;
-	phy_isr_handle_t rmt_driver_intr_handle;
+	intr_handle_t rmt_driver_intr_handle;
 	/* Bitmask of installed drivers channels for protecting concurrent register/unregister of RMT channels (ISR) */
 	uint8_t	rmt_driver_channels;
 	bool		rmt_module_enabled;
@@ -63,7 +64,6 @@ static phy_contex_t rmt_contex = {
 
 phy_config_t adb_rmt_rx;
 RingbufHandle_t phy_rx_buf = NULL;
-bool	  phy_driver_installed = false;
 
 /* static defines */
 static void phy_driver_isr(void *arg);
@@ -92,8 +92,9 @@ esp_err_t phy_config(void) {
 
 	phy_module_enable();
 
-	ESP_RETURN_ON_ERROR(phy_set_gpio(adb_rmt_rx.gpio_num, adb_rmt_rx.flags & PHY_CHANNEL_FLAGS_INVERT_SIG), TAG, "set gpio for RMT driver failed");
-	ESP_RETURN_ON_ERROR(phy_internal_config(&RMT, &adb_rmt_rx), TAG, "initialize RMT driver failed");
+	ESP_RETURN_ON_ERROR(phy_set_gpio(adb_rmt_rx.gpio_num, adb_rmt_rx.flags & PHY_CHANNEL_FLAGS_INVERT_SIG), \
+	                    TAG, "set gpio for RMT device failed");
+	ESP_RETURN_ON_ERROR(phy_internal_config(&RMT, &adb_rmt_rx), TAG, "initialize ADB(PHY) driver failed");
 
 	return ESP_OK;
 }
@@ -101,7 +102,7 @@ esp_err_t phy_config(void) {
 esp_err_t phy_driver_install(size_t rx_buf_size, int intr_alloc_flags) {
 	esp_err_t err = ESP_OK;
 
-	if (phy_driver_installed) {
+	if (phy_rx_buf) {
 		ESP_LOGD(TAG, "RMT driver already installed");
 		return ESP_ERR_INVALID_STATE;
 	}
@@ -133,7 +134,7 @@ esp_err_t phy_driver_install(size_t rx_buf_size, int intr_alloc_flags) {
 
 static void IRAM_ATTR phy_driver_isr(void *arg) {
 	uint32_t status = 0;
-	phy_item32_t *addr = NULL;
+	rmt_symbol_word_t *addr = NULL;
 	rmt_hal_context_t *hal = (rmt_hal_context_t *)arg;
 	BaseType_t HPTaskAwoken = pdFALSE;
 
@@ -161,7 +162,7 @@ static void IRAM_ATTR phy_driver_isr(void *arg) {
 		int item_len = rmt_ll_rx_get_memory_writer_offset(rmt_contex.hal.regs, PHY_CHANNEL_NUM);
 		rmt_ll_rx_set_mem_owner(rmt_contex.hal.regs, PHY_CHANNEL_NUM, RMT_LL_MEM_OWNER_SW);
 		if (phy_rx_buf) {
-			addr = (phy_item32_t *)RMTMEM.chan[PHY_CHANNEL_NUM].data32;
+			addr = (rmt_symbol_word_t *)RMTMEM.chan[PHY_CHANNEL_NUM].data32;
 			BaseType_t res = xRingbufferSendFromISR(phy_rx_buf, (void *)addr, item_len * 4, &HPTaskAwoken);
 			if (res == pdFALSE)
 				ESP_DRAM_LOGE(TAG, "RMT RX buffer is full");
@@ -221,8 +222,9 @@ static esp_err_t phy_internal_config(rmt_dev_t *dev, const phy_config_t *phy_par
 	uint32_t rmt_source_clk_hz;
 	rmt_clock_source_t clk_src = RMT_BASECLK_DEFAULT;
 
-	ESP_RETURN_ON_FALSE(mem_cnt <= SOC_RMT_CHANNELS_PER_GROUP && mem_cnt > 0, ESP_ERR_INVALID_ARG, TAG, PHY_MEM_CNT_ERROR_STR);
-	ESP_RETURN_ON_FALSE(clk_div > 0, ESP_ERR_INVALID_ARG, TAG, PHY_CLK_DIV_ERROR_STR);
+	ESP_RETURN_ON_FALSE(mem_cnt <= SOC_RMT_CHANNELS_PER_GROUP && mem_cnt > 0, \
+	                    ESP_ERR_INVALID_ARG, TAG, "Memory block number error");
+	ESP_RETURN_ON_FALSE(clk_div > 0, ESP_ERR_INVALID_ARG, TAG, "Clock divider error");
 
 	PHY_ENTER_CRITICAL();
 	rmt_ll_enable_mem_access_nonfifo(dev, true);
@@ -253,13 +255,14 @@ static esp_err_t phy_internal_config(rmt_dev_t *dev, const phy_config_t *phy_par
 	return ESP_OK;
 }
 
-esp_err_t phy_isr_deregister(phy_isr_handle_t handle) {
+esp_err_t phy_isr_deregister(intr_handle_t handle) {
     return esp_intr_free(handle);
 }
 
 esp_err_t phy_isr_register(void (*fn)(void *), void *arg, int intr_alloc_flags, intr_handle_t *handle) {
-	ESP_RETURN_ON_FALSE(fn, ESP_ERR_INVALID_ARG, TAG, PHY_ADDR_ERROR_STR);
-	ESP_RETURN_ON_FALSE(rmt_contex.rmt_driver_channels == 0, ESP_FAIL, TAG, "RMT driver installed, can not install ISR handler");
+	ESP_RETURN_ON_FALSE(fn, ESP_ERR_INVALID_ARG, TAG, "ISR address error");
+	ESP_RETURN_ON_FALSE(rmt_contex.rmt_driver_channels == 0, \
+	                    ESP_FAIL, TAG, "RMT driver installed, can not install ISR handler");
 
 	return esp_intr_alloc(rmt_periph_signals.groups[0].irq, intr_alloc_flags, fn, arg, handle);
 }
@@ -277,7 +280,7 @@ void phy_get_status(uint32_t *status) {
 
 /* disable RMT module */
 static void phy_module_disable(void) {
-	/* to suppress build errors about spinlock's __DECLARE_RCC_ATOMIC_ENV */
+
 	int __DECLARE_RCC_ATOMIC_ENV __attribute__ ((unused));
 
 	PHY_ENTER_CRITICAL();
@@ -291,9 +294,7 @@ static void phy_module_disable(void) {
 
 /* enable RMT module */
 static void phy_module_enable(void) {
-	/* to suppress build errors about spinlock's __DECLARE_RCC_ATOMIC_ENV */
-	int __DECLARE_RCC_ATOMIC_ENV __attribute__ ((unused));
-
+	PHY_DECLARE_ATOMIC();
 	PHY_ENTER_CRITICAL();
 	if (rmt_contex.rmt_module_enabled == false) {
 		rmt_ll_enable_bus_clock(0, true);
@@ -327,7 +328,7 @@ esp_err_t phy_rx_stop(void) {
 
 /* set GPIO matrix and GPIO pin for channel 0 */
 esp_err_t phy_set_gpio(gpio_num_t gpio_num, bool invert_signal) {
-	ESP_RETURN_ON_FALSE(GPIO_IS_VALID_GPIO(gpio_num), ESP_ERR_INVALID_ARG, TAG, "PHY(ADB) invalid GPIO");
+	ESP_RETURN_ON_FALSE(GPIO_IS_VALID_GPIO(gpio_num), ESP_ERR_INVALID_ARG, TAG, "invalid GPIO");
 
 	gpio_func_sel(gpio_num, PIN_FUNC_GPIO);
 	gpio_set_direction(gpio_num, GPIO_MODE_INPUT);

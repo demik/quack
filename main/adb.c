@@ -27,12 +27,12 @@
 #include <freertos/ringbuf.h>
 #include <freertos/semphr.h>
 #include <freertos/task.h>
-#include "esp_log.h"
-#include "esp_system.h"
-#include "esp_chip_info.h"
-#include "esp_private/periph_ctrl.h"
-#include "soc/periph_defs.h"
-#include "soc/rmt_reg.h"
+#include <esp_log.h>
+#include <esp_system.h>
+#include <esp_chip_info.h>
+#include <esp_private/periph_ctrl.h>
+#include <soc/rmt_reg.h>
+#include <hal/rmt_types.h>
 
 #include "adb.h"
 #include "led.h"
@@ -42,7 +42,7 @@
 /*
  * THEORY OF OPERATION *
  *
- * Quack scheduler is running at 250 Hz which give 4 ms running "slots"
+ * Quack scheduler is running at 250 Hz which give 4 ms time "slots"
  *
  * TRANSMITTING *
  * It's done by toggling the GPIO in an active loop, which is less than ideal because
@@ -50,23 +50,28 @@
  *
  * For polling it's ok because the ADB command (TALK) can be send under 4ms so the task
  * shouldn't be rescheduled. For the initial setup it can be a little longer (up to 12 ms)
- * so there is risks of being rescheduled here. On can avoid most of it by putting the
- * transmitting task into high priority and only running others tasks as low priority.
+ * so there is risks of being rescheduled here. One can avoid most of it by putting the
+ * transmitting task into as priority and only running others tasks as low priority.
  *
  * RECEIVING *
  * since we can be scheduled anytime during reception, reception is done using the RMT
  * (Remote Control Transceiver) transceiver of the ESP32.
  *
- * Before ESP-IDF v5.0, it was donne using the RMT driver but this has been deprecated
- * a subset of it for this specific project has been reimplemented within the phy.* files
+ * Before ESP-IDF v5.0, it was donne using the RMT driver but this has been deprecated.
+ * A subset of it for this specific project has been reimplemented within the phy.* files
  * using the RMT HAL.
+ *
+ * The driver grab the ADB pulses for about 8ms, then pass then into a ringbuf,
+ * which are then decoded in adb_rx_mouse(). the 8ms is a compromise to be able to poll
+ * at a decent rate because the peripheral can't know when the transmission happens.
+ * this limit us to about 20 bits
  *
  * Overall, in order to not push our luck this realistically limit the mouse protocol to
  * the simpler ones (classic 100 and 200 cpi)
  */
 
 /* defines */
-#define TAG "ADB"
+#define TAG "ADB_MGR"
 
 /* globals */
 extern TaskHandle_t t_adb2hid;
@@ -77,9 +82,9 @@ extern QueueHandle_t q_qx, q_qy;
 /* static defines */
 static void	adb_handle_button(bool action);
 static void	adb_phy_reset(void);
-static bool	adb_rx_isone(phy_item32_t cell);
-static bool	adb_rx_isstop(phy_item32_t cell);
-static bool	adb_rx_iszero(phy_item32_t cell);
+static bool	adb_rx_isone(rmt_symbol_word_t cell);
+static bool	adb_rx_isstop(rmt_symbol_word_t cell);
+static bool	adb_rx_iszero(rmt_symbol_word_t cell);
 static uint16_t adb_rx_mouse(void);
 static void	adb_rx_setup(void);
 static void	adb_scan_macaj(void);
@@ -163,10 +168,12 @@ void adb_probe(void) {
 
 		adb_tx_cmd(ADB_MOUSE|ADB_TALK|ADB_REG3);
 		register3 = adb_rx_mouse();
-		ESP_LOGD("ADB", "Device $3 register3: %04x", register3);
+		ESP_LOGD(TAG, "$3 register3: %04x", register3);
 
-		if (register3 && (register3 & ADB_H_ALL) == ADB_H_ERR)
+		if (register3 && (register3 & ADB_H_ALL) == ADB_H_ERR) {
 			ESP_LOGE(TAG, "Mouse failed self init test");
+			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
+		}
 
 		/*
 		 * try to unglue composite devices (Kensington)
@@ -381,7 +388,7 @@ void	adb_task_host(void *pvParameters) {
 					else
 						state = ADB_S_KEEP;
 				}
-				ESP_LOGD("ADB", "Check mouse presence %04x", data);
+				ESP_LOGD(TAG, "Checking $3: %04x", data);
 			}
 		}
 	}
@@ -417,22 +424,22 @@ void	adb_task_idle(void *pvParameters) {
  * units are in µs
  */
 
-static bool adb_rx_isone(phy_item32_t cell) {
+static bool adb_rx_isone(rmt_symbol_word_t cell) {
 	if (cell.level0 == 0 && (cell.duration0 >= 22 && cell.duration0 <= 44) &&
 		cell.level1 == 1 && (cell.duration1 >= 46 && cell.duration1 <= 86))
 		return true;
 	return false;
 }
 
-static bool adb_rx_isstop(phy_item32_t cell) {
-	/* high part of the well is lengh 0 because of RMT timeout (100µs+) */
+static bool adb_rx_isstop(rmt_symbol_word_t cell) {
+	/* high part of the end cell is lengh 0 because of RMT timeout (100µs+) */
 	if (cell.level0 == 0 && (cell.duration0 >= 46 && cell.duration0 <= 86) &&
 		cell.level1 == 1 && cell.duration1 == 0)
 		return true;
 	return false;
 }
 
-static bool adb_rx_iszero(phy_item32_t cell) {
+static bool adb_rx_iszero(rmt_symbol_word_t cell) {
 	if (cell.level0 == 0 && (cell.duration0 >= 46 && cell.duration0 <= 86) &&
 		cell.level1 == 1 && (cell.duration1 >= 22 && cell.duration1 <= 44))
 		return true;
@@ -443,14 +450,14 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 	uint32_t phy_status;
 	uint16_t data = 0;
 	RingbufHandle_t rb = NULL;
-	phy_item32_t* items = NULL;
+	rmt_symbol_word_t* items = NULL;
 	size_t rx_size = 0;
 	size_t i;
 
 	phy_get_ringbuf_handle(&rb);
 	configASSERT(rb != NULL);
 	phy_rx_start(true);
-	items = (phy_item32_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
+	items = (rmt_symbol_word_t*)xRingbufferReceive(rb, &rx_size, pdMS_TO_TICKS(8));
 
 	phy_get_status(&phy_status);
 	if (((phy_status >> RMT_STATE_CH0_S) & RMT_STATE_CH0_V) == 4)
@@ -461,7 +468,7 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 		return 0;
 
 	/*
-	 * Mouse response size in bits is events / sizeof(phy_item32_t) (4)
+	 * Mouse response size in bits is events / sizeof(rmt_symbol_word_t) (4)
 	 * start bit + 16 data bits + stop bit = 72 bytes in RMT buffer (18 bits received)
 	 *
 	 * Check start / stop bits and size.
@@ -479,18 +486,18 @@ static uint16_t	IRAM_ATTR adb_rx_mouse() {
 			xTaskNotify(t_yellow, LED_ONCE, eSetValueWithOverwrite);
 			break;
 		default:
-			ESP_LOGD(TAG, "wrong size of %i bit(s)", rx_size / sizeof(phy_item32_t));
+			ESP_LOGD(TAG, "wrong size of %i bit(s)", rx_size / sizeof(rmt_symbol_word_t));
 			xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 	}
 
 	/* check start and stop bits */
-	if (! adb_rx_isone(*(items+0)) && (! adb_rx_isstop(*(items+(rx_size / sizeof(phy_item32_t) - 1))))) {
+	if (! adb_rx_isone(*(items+0)) && (! adb_rx_isstop(*(items+(rx_size / sizeof(rmt_symbol_word_t) - 1))))) {
 		xTaskNotify(t_red, LED_ONCE, eSetValueWithOverwrite);
 		return 0;
 	}
 
 	/* rebuild our data with RMT buffer */
-	for (i = 1; i < ((rx_size / sizeof(phy_item32_t)) - 1); i++) {
+	for (i = 1; i < ((rx_size / sizeof(rmt_symbol_word_t)) - 1); i++) {
 		data <<= 1;
 
 		/* check that every data is either one or zero */
