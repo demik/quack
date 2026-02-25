@@ -377,6 +377,8 @@ void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void
 	/* union described in include/esp_hidh.h */
 	switch (event) {
 		case ESP_HIDH_OPEN_EVENT: {
+			if (param->open.status != ESP_OK)
+				break;
 			esp_hidh_dev_dump(param->open.dev, stdout);
 			blue_h_open(param);
 			break;
@@ -402,8 +404,16 @@ void blue_h_callback(void *handler_args, esp_event_base_t base, int32_t id, void
 			blue_h_close(param);
 			break;
 		}
+		case ESP_HIDH_START_EVENT: {
+			ESP_LOGD(TAG, "Bluetooth stack started");
+			break;
+		}
+		case ESP_HIDH_STOP_EVENT: {
+			ESP_LOGD(TAG, "Bluetooth stack stopped");
+			break;
+		}
 		default:
-			ESP_LOGI(TAG, "Unknwown event: %d", event);
+			ESP_LOGW(TAG, "Unknwown event: %d", event);
 	}
 }
 
@@ -612,12 +622,15 @@ static esp_hid_report_item_t blue_h_ri_find(esp_hidh_dev_t *d, esp_hid_usage_t u
 /* get report map raw pointer. Also dump it on JTAG */
 static esp_hid_raw_report_map_t *blue_hid_rm_get(esp_hidh_dev_t *dev) {
 	size_t num_maps = 0;
-	esp_hid_raw_report_map_t *maps;
+	esp_hid_raw_report_map_t *maps = NULL;
 
 	configASSERT(dev != NULL);
 	ESP_LOGI(TAG, BLUE_SNIP);
 	esp_hidh_dev_report_maps_get(dev, &num_maps, &maps);
-	ESP_LOG_BUFFER_HEX(TAG, maps[0].data, maps[0].len);
+	if (maps)
+		ESP_LOG_BUFFER_HEX(TAG, maps[0].data, maps[0].len);
+	else
+		ESP_LOGE(TAG, "report map is empty");
 	ESP_LOGI(TAG, BLUE_SNIP);
 
 	/* looking at 4.2 SDK source, seems there is always only one map */

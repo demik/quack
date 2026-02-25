@@ -420,7 +420,14 @@ void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
         break;
 #endif
     case ESP_BT_GAP_MODE_CHG_EVT:
-        ESP_LOGI(TAG, "BT GAP MODE_CHG_EVT mode:%d", param->mode_chg.mode);
+        ESP_LOGI(TAG, "ESP_BT_GAP_MODE_CHG_EVT mode: %d, interval: %.2f ms",
+                 param->mode_chg.mode, param->mode_chg.interval * 0.625);
+        break;
+    case ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT:
+        ESP_LOGI(TAG, "ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT Connected, status: 0x%x", param->acl_conn_cmpl_stat.stat);
+        break;
+    case ESP_BT_GAP_ACL_DISCONN_CMPL_STAT_EVT:
+        ESP_LOGI(TAG, "ESP_BT_GAP_ACL_DISC_CMPL_STAT_EVT Disconnected, reason: 0x%x", param->acl_disconn_cmpl_stat.reason);
         break;
     case ESP_BT_GAP_PIN_REQ_EVT: {
         ESP_LOGI(TAG, "BT GAP PIN_REQ_EVT min_16_digit:%d", param->pin_req.min_16_digit);
@@ -437,7 +444,7 @@ void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
         break;
     }
     default:
-        ESP_LOGW(TAG, "BT GAP EVENT %s", bt_gap_evt_str(event));
+        ESP_LOGW(TAG, "BT GAP EVENT %u, %s", event, bt_gap_evt_str(event));
         break;
     }
 }

@@ -125,7 +125,7 @@ void	adb_init(void) {
 	gpio_set_level(GPIO_ADB, 1);
 	adb_tx_reset();
 
-	/* avoid console flood when installing/uninstalling RMT driver */
+	/* avoid console flood when installing/uninstalling RMT (ADB PHY) driver */
 	esp_log_level_set("intr_alloc", ESP_LOG_INFO);
 	phy_config();
 

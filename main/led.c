@@ -128,8 +128,13 @@ void	led_dispatch(void *pvParameters)
 	/* avoit cur duty + target spam on console */
 	esp_log_level_set("ledc", ESP_LOG_INFO);
 
+	/*
+	 * since IDF v5.5, we do need blue task on core 0, otherwise xTaskNotifyWait from the blue LED goes into a weird loop.
+	 * Seems to be a race condition or something similar with vTaskDelete(). xTaskNotifyFromISR() is of no help
+	 * This is not really a problem since Bluetooth is also running on core 0
+	 */
 	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_GREENLED), 2 * 1024, (void *) GPIO_GREENLED, tskIDLE_PRIORITY, &t_green, 1);
-	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_BLUELED), 2 * 1024, (void *) GPIO_BLUELED, tskIDLE_PRIORITY, &t_blue, 1);
+	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_BLUELED), 2 * 1024, (void *) GPIO_BLUELED, tskIDLE_PRIORITY, &t_blue, 0);
 	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_YELLOWLED), 2 * 1024, (void *) GPIO_YELLOWLED, tskIDLE_PRIORITY, &t_yellow, 1);
 	xTaskCreatePinnedToCore(led_task, led_gpio_name(GPIO_REDLED), 2 * 1024, (void *) GPIO_REDLED, tskIDLE_PRIORITY, &t_red, 1);
 
@@ -231,6 +236,7 @@ void	led_task(void *pvParameters) {
 				wait = 500 / portTICK_PERIOD_MS;
 				break;
 			default:
+				ESP_LOGE(TAG, "unknown mode %u for task %s", mode, led_gpio_name(color));
 				break;
 		}
 	}
