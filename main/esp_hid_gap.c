@@ -396,7 +396,7 @@ void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
 {
     switch (event) {
     case ESP_BT_GAP_DISC_STATE_CHANGED_EVT: {
-        ESP_LOGV(TAG, "BT GAP DISC_STATE %s", (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STARTED) ? "START" : "STOP");
+        ESP_LOGV(TAG, "DISC_STATE %s", (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STARTED) ? "START" : "STOP");
         if (param->disc_st_chg.state == ESP_BT_GAP_DISCOVERY_STOPPED) {
             SEND_BT_CB();
         }
@@ -406,31 +406,23 @@ void bt_gap_event_handler(esp_bt_gap_cb_event_t event, esp_bt_gap_cb_param_t *pa
         handle_bt_device_result(&param->disc_res);
         break;
     }
-#if (CONFIG_EXAMPLE_SSP_ENABLED)
-    case ESP_BT_GAP_KEY_NOTIF_EVT:
-        ESP_LOGI(TAG, "BT GAP KEY_NOTIF passkey:%06"PRIu32, param->key_notif.passkey);
-        break;
-    case ESP_BT_GAP_CFM_REQ_EVT: {
-        ESP_LOGI(TAG, "BT GAP CFM_REQ_EVT Please compare the numeric value: %06"PRIu32, param->cfm_req.num_val);
-        esp_bt_gap_ssp_confirm_reply(param->cfm_req.bda, true);
+    case ESP_BT_GAP_ENC_CHG_EVT: {
+        const char *enc[3] = {"OFF", "E0", "AES"};
+        ESP_LOGI(TAG, "Encryption mode changed to %s", enc[param->enc_chg.enc_mode]);
         break;
     }
-    case ESP_BT_GAP_KEY_REQ_EVT:
-        ESP_LOGI(TAG, "BT GAP KEY_REQ_EVT Please enter passkey!");
-        break;
-#endif
     case ESP_BT_GAP_MODE_CHG_EVT:
-        ESP_LOGI(TAG, "ESP_BT_GAP_MODE_CHG_EVT mode: %d, interval: %.2f ms",
+        ESP_LOGI(TAG, "mode changed to: %d, interval: %.2f ms",
                  param->mode_chg.mode, param->mode_chg.interval * 0.625);
         break;
     case ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT:
-        ESP_LOGI(TAG, "ESP_BT_GAP_ACL_CONN_CMPL_STAT_EVT Connected, status: 0x%x", param->acl_conn_cmpl_stat.stat);
+        ESP_LOGI(TAG, "ACL_CONN_CMPL_STAT_EVT Connected, status: 0x%x", param->acl_conn_cmpl_stat.stat);
         break;
     case ESP_BT_GAP_ACL_DISCONN_CMPL_STAT_EVT:
-        ESP_LOGI(TAG, "ESP_BT_GAP_ACL_DISC_CMPL_STAT_EVT Disconnected, reason: 0x%x", param->acl_disconn_cmpl_stat.reason);
+        ESP_LOGI(TAG, "ACL_DISC_CMPL_STAT_EVT Disconnected, reason: 0x%x", param->acl_disconn_cmpl_stat.reason);
         break;
     case ESP_BT_GAP_PIN_REQ_EVT: {
-        ESP_LOGI(TAG, "BT GAP PIN_REQ_EVT min_16_digit:%d", param->pin_req.min_16_digit);
+        ESP_LOGI(TAG, "PIN_REQ_EVT min_16_digit:%d", param->pin_req.min_16_digit);
         if (param->pin_req.min_16_digit) {
             ESP_LOGI(TAG, "Input pin code: 0000 0000 0000 0000");
             esp_bt_pin_code_t pin_code = {0};
