@@ -624,7 +624,7 @@
 			(net 4 "+3.3V")
 			(pinfunction "VO")
 			(pintype "power_out")
-			(uuid "affbd50a-df56-41e8-bc2b-32df8f20e7d9")
+			(uuid "858c04ca-e7d8-4652-bef3-bd238f48866c")
 		)
 		(pad "3" smd roundrect
 			(at -3.15 2.3 180)
@@ -13741,7 +13741,7 @@
 			)
 		)
 	)
-	(gr_text "Quack Mouse Adapter\nREV 1.5Q"
+	(gr_text "Quack Mouse Adapter\nREV 1.5"
 		(at 180.34 78.105 90)
 		(layer "F.SilkS")
 		(uuid "594f2482-d4bc-4627-8495-01760122d766")
