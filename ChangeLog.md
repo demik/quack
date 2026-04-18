@@ -1,6 +1,6 @@
 ## v1.5.0
-- update to ESP-IDF v5.5.3
-	- https://github.com/espressif/esp-idf/releases/tag/v5.5.3
+- update to ESP-IDF v5.5.4
+	- https://github.com/espressif/esp-idf/releases/tag/v5.5.4
 	- this fixes a few buffers overflows and other rare stuff in Bluedroid
 - 1.5.x series is compatible with 1.3 to 1.5 PCBs (EDA subfolder)
 - new bespoke ADB RX driver has been developed based on the legacy RMT driver
