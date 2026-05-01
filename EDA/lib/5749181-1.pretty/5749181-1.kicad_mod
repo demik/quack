@@ -36,8 +36,8 @@
   (pad MH2 thru_hole circle (at -10.110 2.99) (size 3.356 3.356) (drill 2.237) (layers *.Cu *.Mask))
   (pad MH3 thru_hole circle (at 3.410 2.99) (size 3.356 3.356) (drill 2.237) (layers *.Cu *.Mask))
   (model 5749181-1.stp
-    (at (xyz 0 0 0))
+    (at (xyz -0.1318897600249 -0.3362204709391 0.25826771428266))
     (scale (xyz 1 1 1))
-    (rotate (xyz 0 0 0))
+    (rotate (xyz -90 0 0))
   )
 )

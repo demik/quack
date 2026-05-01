@@ -5532,7 +5532,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Quack_MDIN4:57491811"
+		(property "Footprint" "Quack_MDIN4:5749181-1"
 			(at 247.65 44.45 0)
 			(effects
 				(font
