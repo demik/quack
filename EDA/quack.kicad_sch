@@ -5122,7 +5122,7 @@
 				)
 			)
 		)
-		(property "Value" "1.5kΩ"
+		(property "Value" "2.2kΩ"
 			(at 171.45 98.6536 90)
 			(effects
 				(font
