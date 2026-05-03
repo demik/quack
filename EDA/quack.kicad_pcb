@@ -10800,7 +10800,7 @@
 		)
 		(embedded_fonts no)
 	)
-	(footprint "Macintosh logo:Macintosh logo"
+	(footprint "Quack_logo:Macintosh logo"
 		(layer "F.Cu")
 		(uuid "7f1d76a2-1b9d-430a-8a36-8c81fae7f058")
 		(at 132.75 78.75)
@@ -10871,7 +10871,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "37d297dd-15dd-463c-bfea-c39ff86ac6c1")
+			(uuid "6749f51c-8b76-4bee-b7b9-dee6cbb20062")
 		)
 		(fp_poly
 			(pts
@@ -10891,7 +10891,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "f131d5b0-8e9b-4377-bd6b-380d7c2750be")
+			(uuid "8d470bad-7207-4a05-8bc0-fe4ed882edcd")
 		)
 		(fp_poly
 			(pts
@@ -10912,7 +10912,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "d7660560-e547-4419-b953-57723c5dcc84")
+			(uuid "1c1721ab-e3e9-4c1b-918c-2724d8d9e72c")
 		)
 		(fp_poly
 			(pts
@@ -10938,7 +10938,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "4ab14787-78a4-4bda-b6a2-ddb8ef776e51")
+			(uuid "db1111f4-521d-4eed-b8d8-d43116b74aeb")
 		)
 		(fp_poly
 			(pts
@@ -10970,7 +10970,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "59fa5668-c7d3-4ea0-92a5-c7e449fcc889")
+			(uuid "bf6c154e-bfee-4ed9-bb3a-54735ee28345")
 		)
 		(fp_poly
 			(pts
@@ -11017,7 +11017,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "093dd93a-fa31-48e5-a242-b47f49717c7e")
+			(uuid "94651a20-466b-4b11-83c5-11e623c7454b")
 		)
 		(fp_poly
 			(pts
@@ -11067,7 +11067,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "b044f099-1c21-459c-be10-19a5c8e301ea")
+			(uuid "bde06917-62ca-4cee-8a10-8db11eb974a9")
 		)
 		(fp_poly
 			(pts
@@ -11121,7 +11121,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "e7411282-0ebd-4364-8eef-4f711d90ba12")
+			(uuid "8d57e425-007b-4a37-9fb6-e026c50eb41d")
 		)
 		(fp_poly
 			(pts
@@ -11170,7 +11170,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "1623d4f1-3907-435c-9281-2822a17755a1")
+			(uuid "10aefe88-d068-4656-9cb0-56f3c3aa98f2")
 		)
 		(fp_poly
 			(pts
@@ -11223,7 +11223,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "3a082ae8-0616-4764-98fb-2cf74e41ee40")
+			(uuid "3bd492e7-f1c4-4cd8-9446-8f6095f57367")
 		)
 		(fp_poly
 			(pts
@@ -11298,11 +11298,11 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "305c8eaf-0266-402b-a97b-fd24a29a6e3b")
+			(uuid "fb7a850c-727d-4f55-a0fd-e92208dd3210")
 		)
 		(embedded_fonts no)
 	)
-	(footprint "ADB_logo_5mm:ADB_logo_5mm"
+	(footprint "Quack_logo:ADB_logo_5mm"
 		(layer "F.Cu")
 		(uuid "8128e138-9f35-4530-a999-e7d8654cfe0c")
 		(at 144 121.25)
@@ -11397,7 +11397,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "fe663313-c9d6-414b-892e-f6510bcff41b")
+			(uuid "aa756eb4-069c-4ac3-a24e-958ef33b626b")
 		)
 		(fp_poly
 			(pts
@@ -11447,7 +11447,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "925101d4-429d-429d-8d71-d60a2c35c417")
+			(uuid "a58fc763-c0ab-468a-abd6-c9414cfa21ae")
 		)
 		(fp_poly
 			(pts
@@ -11494,7 +11494,7 @@
 			)
 			(fill yes)
 			(layer "F.SilkS")
-			(uuid "cabcc134-5be7-490c-ac73-94b56c968a20")
+			(uuid "45aa707b-77e2-4b6e-b24f-815ee15985ca")
 		)
 		(embedded_fonts no)
 	)
