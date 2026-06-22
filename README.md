@@ -28,19 +28,16 @@ A dongle that allows various retro systems to use the `Apple Desktop Bus` as wel
 
 #### Systems
 
-<kbd>  Macintosh 128 / 512 / Plus  </kbd>  <kbd>  Apple Lisa  </kbd>  <kbd>  Apple IIc  </kbd>
+<kbd>&nbsp;&nbsp;Macintosh 128 / 512 / Plus&nbsp;&nbsp;</kbd> 
+<kbd>&nbsp;&nbsp;Apple Lisa&nbsp;&nbsp;</kbd> 
+<kbd>&nbsp;&nbsp;Apple IIc&nbsp;&nbsp;</kbd> 
+<a href="https://github.com/DosFox1/OSHintosh"><kbd>&nbsp;&nbsp;OSHintosh&nbsp;&nbsp;</kbd></a>
 
 #### Connection Types
 
-<kbd>  Apple Desktop Bus  </kbd>  <kbd>  Bluetooth Classic 2+  </kbd>
+<kbd>  Apple Desktop Bus  </kbd> <kbd>  Bluetooth Classic 2+  </kbd>
 
 <br>
-<br>
-
-### Unsupported
-
-- `ADB`  ➞  `Bluetooth LE` for **Non-Windows 10**
-
 <br>
 
 <!----------------------------------------------------------------------------->
@@ -52,6 +49,7 @@ A dongle that allows various retro systems to use the `Apple Desktop Bus` as wel
 [License]: LICENSE
 [PCB]: EDA/ChangeLog.md
 [CI]: https://github.com/demik/quack/actions/workflows/idf.yml
+[OSHintosh]: https://github.com/DosFox1/OSHintosh
 
 <!-------------------------------[ Badges ]----------------------------------->
 
