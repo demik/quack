@@ -50,6 +50,8 @@ void	gpio_init(void) {
 	gpio_reset_pin(GPIO_BTOFF);
 	gpio_set_direction(GPIO_ADBSRC, GPIO_MODE_INPUT);
 	gpio_set_direction(GPIO_BTOFF, GPIO_MODE_INPUT);
+	gpio_set_pull_mode(GPIO_ADBSRC, GPIO_PULLUP_ONLY);
+	gpio_set_pull_mode(GPIO_BTOFF, GPIO_PULLUP_ONLY);
 
 	/* ADB */
 	gpio_set_direction(GPIO_ADB, GPIO_MODE_INPUT);
